@@ -1,5 +1,6 @@
 # Rust SGP30 Driver
 
+[![CircleCI][circle-ci-badge]][circle-ci]
 [![Crates.io Version][crates-io-badge]][crates-io]
 [![Crates.io Downloads][crates-io-download-badge]][crates-io-download]
 
@@ -28,6 +29,8 @@ Datasheet: https://www.sensirion.com/file/datasheet_sgp30
 - [ ] Publish to crates.io
 
 <!-- Badges -->
+[circle-ci]: https://circleci.com/gh/dbrgn/sgp30-rs/tree/master
+[circle-ci-badge]: https://circleci.com/gh/dbrgn/sgp30-rs/tree/master.svg?style=shield
 [crates-io]: https://crates.io/crates/sgp30
 [crates-io-badge]: https://img.shields.io/crates/v/sgp30.svg?maxAge=3600
 [crates-io-download]: https://crates.io/crates/sgp30
