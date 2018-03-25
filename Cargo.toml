@@ -1,0 +1,10 @@
+[package]
+authors = ["Danilo Bargen <mail@dbrgn.ch>"]
+name = "sgp30"
+version = "0.1.0"
+
+[dependencies]
+embedded-hal = "0.1"
+
+[dev-dependencies]
+linux-embedded-hal = "0.1"
