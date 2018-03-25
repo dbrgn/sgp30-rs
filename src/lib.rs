@@ -9,6 +9,9 @@ use hal::blocking::delay::DelayUs;
 use hal::blocking::i2c::{Read, Write, WriteRead};
 
 
+const CRC8_POLYNOMIAL: u8 = 0x31;
+
+
 /// All possible errors in this crate
 #[derive(Debug)]
 pub enum Error<E> {
@@ -63,23 +66,21 @@ where
     }
 }
 
-fn crc8(data: [u8; 2]) -> u8 {
+/// Calculate the CRC8 checksum.
+///
+/// Implementation based on the reference implementation by Sensirion.
+fn crc8(data: &[u8]) -> u8 {
     let mut crc: u8 = 0xff;
-    let crc8_polynomial: u8 = 0x31;
-
-    /* calculates 8-Bit checksum with given polynomial */
-    let count = 2;
-    for i in 0..count {
-        crc ^= data[i];
+    for byte in data {
+        crc ^= byte;
         for _ in 0..8 {
             if (crc & 0x80) > 0 {
-                crc = (crc << 1) ^ crc8_polynomial;
+                crc = (crc << 1) ^ CRC8_POLYNOMIAL;
             } else {
-                crc = (crc << 1);
+                crc = crc << 1;
             }
         }
     }
-
     crc
 }
 
@@ -87,8 +88,10 @@ fn crc8(data: [u8; 2]) -> u8 {
 mod tests {
     use super::*;
 
+    /// Test the crc8 function against the test value provided in the
+    /// datasheet (section 6.6).
     #[test]
-    fn crc8_sensi_awesome_correct_examplebeef() {
-        assert_eq!(crc8([0xbe, 0xef]), 0x92);
+    fn crc8_test_value() {
+        assert_eq!(crc8(&[0xbe, 0xef]), 0x92);
     }
 }
