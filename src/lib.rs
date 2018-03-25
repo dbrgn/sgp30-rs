@@ -143,12 +143,11 @@ mod tests {
         assert_eq!(crc8(&[0xbe, 0xef]), 0x92);
     }
 
-    /// Test the validate_crc function.
+    /// Test the `validate_crc` function.
     #[test]
     fn validate_crc() {
         let dev = hal::I2cMock::new();
-        let address = 0x58;
-        let mut sgp = Sgp30::new(dev, address, hal::DelayMockNoop);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
 
         // Not enough data
         sgp.validate_crc(&[]).unwrap();
@@ -174,5 +173,29 @@ mod tests {
             Err(_) => panic!("Invalid error: Must be Crc"),
             Ok(_) => panic!("CRC check did not fail"),
         }
+    }
+
+    /// Test the `read_with_crc` function.
+    #[test]
+    fn read_with_crc() {
+        let mut buf = [0; 3];
+
+        /// Valid CRC
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0xbe, 0xef, 0x92]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        sgp.read_with_crc(&mut buf).unwrap();
+        assert_eq!(buf, [0xbe, 0xef, 0x92]);
+
+        /// Valid CRC
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0xbe, 0xef, 0x00]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        match sgp.read_with_crc(&mut buf) {
+            Err(Error::Crc) => {},
+            Err(_) => panic!("Invalid error: Must be Crc"),
+            Ok(_) => panic!("CRC check did not fail"),
+        }
+        assert_eq!(buf, [0xbe, 0xef, 0x00]); // Buf was changed
     }
 }
