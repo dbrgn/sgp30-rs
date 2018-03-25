@@ -23,10 +23,6 @@ pub enum Error<E> {
     /// User tried to measure the air quality without starting the
     /// initialization phase.
     NotInitialized,
-    /// The air quality measurements were initialized, but the sensor is still
-    /// in the initialization phase and returned the default values of 400 ppm
-    /// CO₂eq and 0 ppb TVOC. See datasheet section 6.3 for details.
-    NotReady,
 }
 
 
@@ -170,10 +166,10 @@ where
     /// of this driver to ensure that these periodic measurements are being
     /// done.
     ///
-    /// For the first 15s after initializing the air quality measurement, the
+    /// For the first 15 s after initializing the air quality measurement, the
     /// sensor is in an initialization phase during which it returns fixed
-    /// values of 400 ppm CO₂eq and 0 ppb TVOC. The driver will convert those
-    /// values into an [`Error::NotReady`](enum.Error.html#variant.NotReady).
+    /// values of 400 ppm CO₂eq and 0 ppb TVOC. After 15 s (15 measurements)
+    /// the values should start to change.
     pub fn init(&mut self) -> Result<(), Error<E>> {
         if self.initialized {
             // Already initialized
@@ -211,10 +207,10 @@ where
     /// of this driver to ensure that these periodic measurements are being
     /// done.
     ///
-    /// For the first 15s after initializing the air quality measurement, the
+    /// For the first 15 s after initializing the air quality measurement, the
     /// sensor is in an initialization phase during which it returns fixed
-    /// values of 400 ppm CO₂eq and 0 ppb TVOC. The driver will convert those
-    /// values into an [`Error::NotReady`](enum.Error.html#variant.NotReady).
+    /// values of 400 ppm CO₂eq and 0 ppb TVOC. After 15 s (15 measurements)
+    /// the values should start to change.
     pub fn measure(&mut self) -> Result<(u16, u16), Error<E>> {
         if !self.initialized {
             // Measurements weren't initialized
