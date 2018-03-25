@@ -5,7 +5,7 @@
 
 extern crate embedded_hal as hal;
 
-use hal::blocking::delay::DelayUs;
+use hal::blocking::delay::{DelayMs, DelayUs};
 use hal::blocking::i2c::{Read, Write, WriteRead};
 
 
@@ -24,13 +24,17 @@ pub enum Error<E> {
 
 #[derive(Debug)]
 pub enum Command {
+    /// Return the serial number.
     GetSerial,
+    /// Run an on-chip self-test.
+    SelfTest,
 }
 
 impl Command {
     fn as_bytes(&self) -> [u8; 2] {
         match *self {
             Command::GetSerial => [0x36, 0x82],
+            Command::SelfTest => [0x20, 0x32],
         }
     }
 }
@@ -50,7 +54,7 @@ pub struct Sgp30<I2C, D> {
 impl<I2C, D, E> Sgp30<I2C, D>
 where
     I2C: Read<Error = E> + Write<Error = E> + WriteRead<Error = E>,
-    D: DelayUs<u16>,
+    D: DelayUs<u16> + DelayMs<u16>,
 {
     pub fn new(i2c: I2C, address: u8, delay: D) -> Self {
         Sgp30 {
@@ -112,6 +116,26 @@ where
            buf[3], buf[4],
            buf[6], buf[7],
         ])
+    }
+
+    /// Run an on-chip self-test.
+    ///
+    /// Return whether the test succeeded.
+    pub fn selftest(&mut self) -> Result<bool, Error<E>> {
+        let command = Command::SelfTest.as_bytes();
+        self.i2c
+            .write(self.address, &command)
+            .map_err(Error::I2c)?;
+
+        // Recommended wait time according to datasheet (Table 10)
+        self.delay.delay_ms(220);
+
+        // Read result
+        let mut buf = [0; 3];
+        self.read_with_crc(&mut buf)?;
+
+        // Compare with self-test success pattern
+        Ok(&buf[0..2] == &[0xd4, 0x00])
     }
 }
 
@@ -209,5 +233,23 @@ mod tests {
         let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
         let serial = sgp.serial().unwrap();
         assert_eq!(serial, [0, 0, 0, 100, 204, 130]);
+    }
+
+    /// Test the `selftest` function
+    #[test]
+    fn selftest_ok() {
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0xD4, 0x00, 0xC6]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        assert!(sgp.selftest().unwrap());
+    }
+
+    /// Test the `selftest` function
+    #[test]
+    fn selftest_fail() {
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0x12, 0x34, 0x37]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        assert!(!sgp.selftest().unwrap());
     }
 }

@@ -9,5 +9,8 @@ fn main() {
     let dev = I2cdev::new("/dev/i2c-1").unwrap();
     let address = 0x58;
     let mut sgp = Sgp30::new(dev, address, Delay);
-    sgp.serial().unwrap();
+
+    println!("Starting SGP30 tests.\n");
+    println!("     Serial: {:?}", sgp.serial().unwrap());
+    println!("  Self-Test: {}", if sgp.selftest().unwrap() { "Pass" } else { "Fail" });
 }
