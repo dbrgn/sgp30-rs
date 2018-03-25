@@ -1,6 +1,7 @@
 //! SGP30
 
 #![deny(unsafe_code)]
+#![deny(missing_docs)]
 #![no_std]
 
 extern crate embedded_hal as hal;
@@ -19,15 +20,27 @@ pub enum Error<E> {
     I2c(E),
     /// CRC checksum validation failed
     Crc,
+    /// User tried to measure the air quality without starting the
+    /// initialization phase.
+    NotInitialized,
+    /// The air quality measurements were initialized, but the sensor is still
+    /// in the initialization phase and returned the default values of 400 ppm
+    /// CO₂eq and 0 ppb TVOC. See datasheet section 6.3 for details.
+    NotReady,
 }
 
 
+/// I²C commands sent to the sensor.
 #[derive(Debug)]
 pub enum Command {
     /// Return the serial number.
     GetSerial,
     /// Run an on-chip self-test.
     SelfTest,
+    /// Initialize air quality measurements.
+    InitAirQuality,
+    /// Get a current air quality measurement.
+    MeasureAirQuality,
 }
 
 impl Command {
@@ -35,6 +48,8 @@ impl Command {
         match *self {
             Command::GetSerial => [0x36, 0x82],
             Command::SelfTest => [0x20, 0x32],
+            Command::InitAirQuality => [0x20, 0x03],
+            Command::MeasureAirQuality => [0x20, 0x08],
         }
     }
 }
@@ -49,6 +64,8 @@ pub struct Sgp30<I2C, D> {
     address: u8,
     /// The concrete Delay implementation.
     delay: D,
+    /// Whether the air quality measurement was initialized.
+    initialized: bool,
 }
 
 impl<I2C, D, E> Sgp30<I2C, D>
@@ -56,12 +73,21 @@ where
     I2C: Read<Error = E> + Write<Error = E> + WriteRead<Error = E>,
     D: DelayUs<u16> + DelayMs<u16>,
 {
+    /// Create a new instance of the SGP30 driver.
     pub fn new(i2c: I2C, address: u8, delay: D) -> Self {
         Sgp30 {
             i2c,
             address,
             delay,
+            initialized: false,
         }
+    }
+
+    /// Write an I²C command to the sensor.
+    fn send_command(&mut self, command: Command) -> Result<(), Error<E>> {
+        self.i2c
+            .write(self.address, &command.as_bytes())
+            .map_err(Error::I2c)
     }
 
     /// Iterate over the provided buffer and validate the CRC8 checksum.
@@ -99,10 +125,7 @@ where
     /// Return the 48 bit serial number of the SGP30.
     pub fn serial(&mut self) -> Result<[u8; 6], Error<E>> {
         // Request serial number
-        let command = Command::GetSerial.as_bytes();
-        self.i2c
-            .write(self.address, &command)
-            .map_err(Error::I2c)?;
+        self.send_command(Command::GetSerial)?;
 
         // Recommended wait time according to datasheet (6.5)
         self.delay.delay_us(500);
@@ -118,16 +141,12 @@ where
         ])
     }
 
-    /// Run an on-chip self-test.
-    ///
-    /// Return whether the test succeeded.
+    /// Run an on-chip self-test. Return a boolean indicating whether the test succeeded.
     pub fn selftest(&mut self) -> Result<bool, Error<E>> {
-        let command = Command::SelfTest.as_bytes();
-        self.i2c
-            .write(self.address, &command)
-            .map_err(Error::I2c)?;
+        // Start self test
+        self.send_command(Command::SelfTest)?;
 
-        // Recommended wait time according to datasheet (Table 10)
+        // Max duration according to datasheet (Table 10)
         self.delay.delay_ms(220);
 
         // Read result
@@ -136,6 +155,85 @@ where
 
         // Compare with self-test success pattern
         Ok(&buf[0..2] == &[0xd4, 0x00])
+    }
+
+    /// Initialize the air quality measurement.
+    ///
+    /// The SGP30 uses a dynamic baseline compensation algorithm and on-chip
+    /// calibration parameters to provide two complementary air quality
+    /// signals.
+    ///
+    /// Calling this method starts the air quality measurement. After
+    /// initializing the measurement, the `measure()` method must be called in
+    /// regular intervals of 1s to ensure proper operation of the dynamic
+    /// baseline compensation algorithm. It is the responsibility of the user
+    /// of this driver to ensure that these periodic measurements are being
+    /// done.
+    ///
+    /// For the first 15s after initializing the air quality measurement, the
+    /// sensor is in an initialization phase during which it returns fixed
+    /// values of 400 ppm CO₂eq and 0 ppb TVOC. The driver will convert those
+    /// values into an [`Error::NotReady`](enum.Error.html#variant.NotReady).
+    pub fn init(&mut self) -> Result<(), Error<E>> {
+        if self.initialized {
+            // Already initialized
+            return Ok(());
+        }
+        self.force_init()
+    }
+
+    /// Like [`init()`](struct.Sgp30.html#method.init), but without checking
+    /// whether the sensor is already initialized.
+    ///
+    /// This might be necessary after a sensor soft or hard reset.
+    pub fn force_init(&mut self) -> Result<(), Error<E>> {
+        // Send command to sensor
+        self.send_command(Command::InitAirQuality)?;
+
+        // Max duration according to datasheet (Table 10)
+        self.delay.delay_ms(10);
+
+        self.initialized = true;
+        Ok(())
+    }
+
+    /// Get an air quality measurement.
+    ///
+    /// Before calling this method, the air quality measurements must have been
+    /// initialized using the [`init()`](struct.Sgp30.html#method.init) method.
+    /// Otherwise an [`Error::NotInitialized`](enum.Error.html#variant.NotInitialized)
+    /// will be returned.
+    ///
+    /// Once the measurements have been initialized, the
+    /// [`measure()`](struct.Sgp30.html#method.measure) method must be called
+    /// in regular intervals of 1s to ensure proper operation of the dynamic
+    /// baseline compensation algorithm. It is the responsibility of the user
+    /// of this driver to ensure that these periodic measurements are being
+    /// done.
+    ///
+    /// For the first 15s after initializing the air quality measurement, the
+    /// sensor is in an initialization phase during which it returns fixed
+    /// values of 400 ppm CO₂eq and 0 ppb TVOC. The driver will convert those
+    /// values into an [`Error::NotReady`](enum.Error.html#variant.NotReady).
+    pub fn measure(&mut self) -> Result<(u16, u16), Error<E>> {
+        if !self.initialized {
+            // Measurements weren't initialized
+            return Err(Error::NotInitialized);
+        }
+
+        // Send command to sensor
+        self.send_command(Command::MeasureAirQuality)?;
+
+        // Max duration according to datasheet (Table 10)
+        self.delay.delay_ms(12);
+
+        // Read result
+        let mut buf = [0; 6];
+        self.read_with_crc(&mut buf)?;
+        let co2eq_ppm = ((buf[0] as u16) << 8) | buf[1] as u16;
+        let tvoc_ppb = ((buf[3] as u16) << 8) | buf[4] as u16;
+
+        Ok((co2eq_ppm, tvoc_ppb))
     }
 }
 
@@ -173,7 +271,7 @@ mod tests {
     #[test]
     fn validate_crc() {
         let dev = hal::I2cMock::new();
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
 
         // Not enough data
         sgp.validate_crc(&[]).unwrap();
@@ -206,14 +304,14 @@ mod tests {
     fn read_with_crc() {
         let mut buf = [0; 3];
 
-        /// Valid CRC
+        // Valid CRC
         let mut dev = hal::I2cMock::new();
         dev.set_read_data(&[0xbe, 0xef, 0x92]);
         let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
         sgp.read_with_crc(&mut buf).unwrap();
         assert_eq!(buf, [0xbe, 0xef, 0x92]);
 
-        /// Valid CRC
+        // Invalid CRC
         let mut dev = hal::I2cMock::new();
         dev.set_read_data(&[0xbe, 0xef, 0x00]);
         let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
@@ -251,5 +349,30 @@ mod tests {
         dev.set_read_data(&[0x12, 0x34, 0x37]);
         let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
         assert!(!sgp.selftest().unwrap());
+    }
+
+    /// Test the `measure` function: Require initialization
+    #[test]
+    fn measure_initialization_required() {
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        match sgp.measure() {
+            Err(Error::NotInitialized) => {},
+            Ok(_) => panic!("Error::NotInitialized not returned"),
+            Err(_) => panic!("Wrong error returned"),
+        }
+    }
+
+    /// Test the `measure` function: Calculation of return values
+    #[test]
+    fn measure_success() {
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        sgp.init().unwrap();
+        let (co2eq, tvoc) = sgp.measure().unwrap();
+        assert_eq!(co2eq, 4_660);
+        assert_eq!(tvoc, 54_274);
     }
 }
