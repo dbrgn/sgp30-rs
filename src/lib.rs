@@ -92,8 +92,8 @@ where
         self.validate_crc(&buf)
     }
 
-    /// Return the serial number of the SGP30.
-    pub fn serial(&mut self) -> Result<u64, Error<E>> {
+    /// Return the 48 bit serial number of the SGP30.
+    pub fn serial(&mut self) -> Result<[u8; 6], Error<E>> {
         // Request serial number
         let command = Command::GetSerial.as_bytes();
         self.i2c
@@ -107,9 +107,11 @@ where
         let mut buf = [0; 9];
         self.read_with_crc(&mut buf)?;
 
-        panic!("buf is {:?}", buf);
-
-        Ok(0)
+        Ok([
+           buf[0], buf[1],
+           buf[3], buf[4],
+           buf[6], buf[7],
+        ])
     }
 }
 
@@ -197,5 +199,15 @@ mod tests {
             Ok(_) => panic!("CRC check did not fail"),
         }
         assert_eq!(buf, [0xbe, 0xef, 0x00]); // Buf was changed
+    }
+
+    /// Test the `serial` function
+    #[test]
+    fn serial() {
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0, 0, 129, 0, 100, 254, 204, 130, 135]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let serial = sgp.serial().unwrap();
+        assert_eq!(serial, [0, 0, 0, 100, 204, 130]);
     }
 }
