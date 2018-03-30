@@ -13,6 +13,9 @@ use byteorder::{BigEndian, ByteOrder};
 use hal::blocking::delay::{DelayMs, DelayUs};
 use hal::blocking::i2c::{Read, Write, WriteRead};
 
+/// Measurement types used in the Sgp30 crate.
+pub mod types;
+
 
 const CRC8_POLYNOMIAL: u8 = 0x31;
 
