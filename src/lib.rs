@@ -37,6 +37,12 @@ pub enum Command {
     InitAirQuality,
     /// Get a current air quality measurement.
     MeasureAirQuality,
+    /// Return the baseline value.
+    GetBaseline,
+    /// Set the baseline value.
+    SetBaseline,
+    /// Set the current relative humidity.
+    SetHumidity,
 }
 
 impl Command {
@@ -46,6 +52,9 @@ impl Command {
             Command::SelfTest => [0x20, 0x32],
             Command::InitAirQuality => [0x20, 0x03],
             Command::MeasureAirQuality => [0x20, 0x08],
+            Command::GetBaseline => [0x20, 0x15],
+            Command::SetBaseline => [0x20, 0x1E],
+            Command::SetHumidity => [0x20, 0x61],
         }
     }
 }
