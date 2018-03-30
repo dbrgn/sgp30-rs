@@ -31,7 +31,7 @@ pub enum Error<E> {
 
 
 /// I²C commands sent to the sensor.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Command {
     /// Return the serial number.
     GetSerial,
@@ -129,10 +129,9 @@ where
     /// validated.
     fn validate_crc(&self, buf: &[u8]) -> Result<(), Error<E>> {
         for chunk in buf.chunks(3) {
-            if chunk.len() == 3 {
-                if crc8(&[chunk[0], chunk[1]]) != chunk[2] {
-                    return Err(Error::Crc);
-                }
+            if chunk.len() == 3
+            && crc8(&[chunk[0], chunk[1]]) != chunk[2] {
+                return Err(Error::Crc);
             }
         }
         Ok(())
@@ -149,7 +148,7 @@ where
         self.i2c
             .read(self.address, &mut buf)
             .map_err(Error::I2c)?;
-        self.validate_crc(&buf)
+        self.validate_crc(buf)
     }
 
     /// Return the 48 bit serial number of the SGP30.
@@ -184,7 +183,7 @@ where
         self.read_with_crc(&mut buf)?;
 
         // Compare with self-test success pattern
-        Ok(&buf[0..2] == &[0xd4, 0x00])
+        Ok(buf[0..2] == [0xd4, 0x00])
     }
 
     /// Initialize the air quality measurement.
@@ -262,8 +261,8 @@ where
         // Read result
         let mut buf = [0; 6];
         self.read_with_crc(&mut buf)?;
-        let co2eq_ppm = ((buf[0] as u16) << 8) | buf[1] as u16;
-        let tvoc_ppb = ((buf[3] as u16) << 8) | buf[4] as u16;
+        let co2eq_ppm = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
+        let tvoc_ppb = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
 
         Ok((co2eq_ppm, tvoc_ppb))
     }
@@ -291,8 +290,8 @@ where
         // Read result
         let mut buf = [0; 6];
         self.read_with_crc(&mut buf)?;
-        let co2eq_baseline = ((buf[0] as u16) << 8) | buf[1] as u16;
-        let tvoc_baseline = ((buf[3] as u16) << 8) | buf[4] as u16;
+        let co2eq_baseline = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
+        let tvoc_baseline = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
 
         Ok((co2eq_baseline, tvoc_baseline))
     }
@@ -341,7 +340,7 @@ fn crc8(data: &[u8]) -> u8 {
             if (crc & 0x80) > 0 {
                 crc = (crc << 1) ^ CRC8_POLYNOMIAL;
             } else {
-                crc = crc << 1;
+                crc <<= 1;
             }
         }
     }
