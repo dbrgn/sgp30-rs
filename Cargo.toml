@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 byteorder = "1.0"
 embedded-hal = "0.1"
+clippy = {version = "0.0.191", optional = true}
 
 [dev-dependencies]
 linux-embedded-hal = "0.1"
@@ -13,3 +14,6 @@ embedded-hal-mock = { git = "https://github.com/dbrgn/embedded-hal-mock" }
 
 [profile.release]
 lto = true
+
+[features]
+default = []

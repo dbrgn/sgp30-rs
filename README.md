@@ -28,6 +28,13 @@ Datasheet: https://www.sensirion.com/file/datasheet_sgp30
 - [ ] Docs
 - [ ] Publish to crates.io
 
+## Linting
+
+To run clippy lints, compile the library with `--features clippy` on a nightly
+compiler:
+
+    $ cargo build --features clippy
+
 <!-- Badges -->
 [circle-ci]: https://circleci.com/gh/dbrgn/sgp30-rs/tree/master
 [circle-ci-badge]: https://circleci.com/gh/dbrgn/sgp30-rs/tree/master.svg?style=shield
