@@ -7,13 +7,19 @@ use linux_embedded_hal::{I2cdev, Delay};
 use sgp30::Sgp30;
 
 
-fn measure_loop(count: u16, sgp: &mut Sgp30<I2cdev, Delay>) {
-    for i in 0..count {
+fn measure_loop(sgp: &mut Sgp30<I2cdev, Delay>) -> ! {
+    let mut i = 0;
+    loop {
         if i != 0 {
             Delay.delay_ms(1000u16);
         }
+        if i % 10 == 0 {
+            let (co2eq_baseline, tvoc_baseline) = sgp.get_baseline().unwrap();
+            println!("Baseline: {} / {}", co2eq_baseline, tvoc_baseline);
+        }
         let (co2eq, tvoc) = sgp.measure().unwrap();
-        println!("{:2}: CO₂eq = {} ppm, TVOC = {} ppb", i + 1, co2eq, tvoc);
+        println!("{}: CO₂eq = {} ppm, TVOC = {} ppb", i + 1, co2eq, tvoc);
+        i += 1;
     }
 }
 
@@ -29,6 +35,6 @@ fn main() {
     println!();
     println!("Initializing...");
     sgp.init().unwrap();
-    println!("Starting measurement loop for 60s...\n");
-    measure_loop(60, &mut sgp);
+    println!("Starting measurement loop, press Ctrl+C to abort...\n");
+    measure_loop(&mut sgp);
 }

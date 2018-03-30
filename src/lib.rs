@@ -170,7 +170,7 @@ where
     ///
     /// Calling this method starts the air quality measurement. After
     /// initializing the measurement, the `measure()` method must be called in
-    /// regular intervals of 1s to ensure proper operation of the dynamic
+    /// regular intervals of 1 s to ensure proper operation of the dynamic
     /// baseline compensation algorithm. It is the responsibility of the user
     /// of this driver to ensure that these periodic measurements are being
     /// done.
@@ -211,7 +211,7 @@ where
     ///
     /// Once the measurements have been initialized, the
     /// [`measure()`](struct.Sgp30.html#method.measure) method must be called
-    /// in regular intervals of 1s to ensure proper operation of the dynamic
+    /// in regular intervals of 1 s to ensure proper operation of the dynamic
     /// baseline compensation algorithm. It is the responsibility of the user
     /// of this driver to ensure that these periodic measurements are being
     /// done.
@@ -239,6 +239,35 @@ where
         let tvoc_ppb = ((buf[3] as u16) << 8) | buf[4] as u16;
 
         Ok((co2eq_ppm, tvoc_ppb))
+    }
+
+    /// Return the baseline values of the baseline correction algorithm.
+    ///
+    /// The SGP30 provides the possibility to read and write the baseline
+    /// values of the baseline correction algorithm. This feature is used to
+    /// save the baseline in regular intervals on an external non-volatile
+    /// memory and restore it after a new power-up or soft reset of the sensor.
+    ///
+    /// This function returns the baseline values for the two air quality
+    /// signals. These two values should be stored on an external memory. After
+    /// a power-up or soft reset, the baseline of the baseline correction
+    /// algorithm can be restored by calling
+    /// [`init()`](struct.Sgp30.html#method.init) followed by
+    /// [`set_baseline()`](struct.Sgp30.html#method.set_baseline).
+    pub fn get_baseline(&mut self) -> Result<(u16, u16), Error<E>> {
+        // Send command to sensor
+        self.send_command(Command::GetBaseline)?;
+
+        // Max duration according to datasheet (Table 10)
+        self.delay.delay_ms(10);
+
+        // Read result
+        let mut buf = [0; 6];
+        self.read_with_crc(&mut buf)?;
+        let co2eq_baseline = ((buf[0] as u16) << 8) | buf[1] as u16;
+        let tvoc_baseline = ((buf[3] as u16) << 8) | buf[4] as u16;
+
+        Ok((co2eq_baseline, tvoc_baseline))
     }
 }
 
@@ -379,5 +408,17 @@ mod tests {
         let (co2eq, tvoc) = sgp.measure().unwrap();
         assert_eq!(co2eq, 4_660);
         assert_eq!(tvoc, 54_274);
+    }
+
+    /// Test the `get_baseline` function
+    #[test]
+    fn get_baseline() {
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        sgp.init().unwrap();
+        let (co2eq_baseline, tvoc_baseline) = sgp.measure().unwrap();
+        assert_eq!(co2eq_baseline, 4_660);
+        assert_eq!(tvoc_baseline, 54_274);
     }
 }
