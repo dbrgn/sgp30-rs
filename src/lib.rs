@@ -4,8 +4,10 @@
 #![deny(missing_docs)]
 #![no_std]
 
+extern crate byteorder;
 extern crate embedded_hal as hal;
 
+use byteorder::{BigEndian, ByteOrder};
 use hal::blocking::delay::{DelayMs, DelayUs};
 use hal::blocking::i2c::{Read, Write, WriteRead};
 
@@ -95,6 +97,27 @@ where
             .map_err(Error::I2c)
     }
 
+    /// Write an I²C command and data to the sensor.
+    ///
+    /// The data slice must have a length of 2 or 4.
+    ///
+    /// CRC checksums will automatically be added to the data.
+    fn send_command_and_data(&mut self, command: Command, data: &[u8]) -> Result<(), Error<E>> {
+        assert!(data.len() == 2 || data.len() == 4);
+        let mut buf = [0; 2 /* command */ + 6 /* max length of data + crc */];
+        buf[0..2].copy_from_slice(&command.as_bytes());
+        buf[2..4].copy_from_slice(&data[0..2]);
+        buf[4] = crc8(&data[0..2]);
+        if data.len() > 2 {
+            buf[5..7].copy_from_slice(&data[2..4]);
+            buf[7] = crc8(&data[2..4]);
+        }
+        let payload = if data.len() > 2 { &buf[0..8] } else { &buf[0..5] };
+        self.i2c
+            .write(self.address, payload)
+            .map_err(Error::I2c)
+    }
+
     /// Iterate over the provided buffer and validate the CRC8 checksum.
     ///
     /// If the checksum is wrong, return `Error::Crc`.
@@ -179,6 +202,8 @@ where
     /// sensor is in an initialization phase during which it returns fixed
     /// values of 400 ppm CO₂eq and 0 ppb TVOC. After 15 s (15 measurements)
     /// the values should start to change.
+    ///
+    /// A new init command has to be sent after every power-up or soft reset.
     pub fn init(&mut self) -> Result<(), Error<E>> {
         if self.initialized {
             // Already initialized
@@ -268,6 +293,38 @@ where
         let tvoc_baseline = ((buf[3] as u16) << 8) | buf[4] as u16;
 
         Ok((co2eq_baseline, tvoc_baseline))
+    }
+
+    /// Set the baseline values for the baseline correction algorithm.
+    ///
+    /// Before calling this method, the air quality measurements must have been
+    /// initialized using the [`init()`](struct.Sgp30.html#method.init) method.
+    /// Otherwise an [`Error::NotInitialized`](enum.Error.html#variant.NotInitialized)
+    /// will be returned.
+    ///
+    /// The SGP30 provides the possibility to read and write the baseline
+    /// values of the baseline correction algorithm. This feature is used to
+    /// save the baseline in regular intervals on an external non-volatile
+    /// memory and restore it after a new power-up or soft reset of the sensor.
+    ///
+    /// This function sets the baseline values for the two air quality
+    /// signals.
+    pub fn set_baseline(&mut self, baseline: (u16, u16)) -> Result<(), Error<E>> {
+        if !self.initialized {
+            // Measurements weren't initialized
+            return Err(Error::NotInitialized);
+        }
+
+        // Send command and data to sensor
+        let mut buf = [0; 4];
+        BigEndian::write_u16(&mut buf[0..2], baseline.0);
+        BigEndian::write_u16(&mut buf[2..4], baseline.1);
+        self.send_command_and_data(Command::GetBaseline, &buf)?;
+
+        // Max duration according to datasheet (Table 10)
+        self.delay.delay_ms(10);
+
+        Ok(())
     }
 }
 

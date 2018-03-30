@@ -18,7 +18,7 @@ Datasheet: https://www.sensirion.com/file/datasheet_sgp30
 ## Status
 
 - [x] Measure air quality
-- [ ] Get and set baseline
+- [x] Get and set baseline
 - [ ] Set humidity
 - [ ] Get feature set version
 - [ ] Get raw signals

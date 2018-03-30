@@ -4,6 +4,7 @@ name = "sgp30"
 version = "0.1.0"
 
 [dependencies]
+byteorder = "1.0"
 embedded-hal = "0.1"
 
 [dev-dependencies]
