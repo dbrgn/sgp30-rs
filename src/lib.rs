@@ -419,7 +419,9 @@ fn crc8(data: &[u8]) -> u8 {
 #[cfg(test)]
 mod tests {
     extern crate embedded_hal_mock as hal;
+
     use super::*;
+    use super::types::ProductType;
 
     /// Test the crc8 function against the test value provided in the
     /// datasheet (section 6.6).
@@ -593,5 +595,17 @@ mod tests {
             /* command: */ 0x20, 0x61,
             /* data + crc8: */ 0x00, 0x00, 0x81,
         ]);
+    }
+
+    /// Test the `get_feature_set` function.
+    #[test]
+    fn get_feature_set() {
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0b00000000, 0x42, 0xDE]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        sgp.init().unwrap();
+        let feature_set = sgp.get_feature_set().unwrap();
+        assert_eq!(feature_set.product_type, ProductType::Sgp30);
+        assert_eq!(feature_set.product_version, 0x42);
     }
 }
