@@ -144,7 +144,7 @@ dependencies = [
 [[package]]
 name = "embedded-hal-mock"
 version = "0.1.0"
-source = "git+https://github.com/dbrgn/embedded-hal-mock#6ad293d6c3e5b81000244eae1e50e6bdccca1d90"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "embedded-hal 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -480,7 +480,7 @@ dependencies = [
  "byteorder 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.191 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "embedded-hal-mock 0.1.0 (git+https://github.com/dbrgn/embedded-hal-mock)",
+ "embedded-hal-mock 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "linux-embedded-hal 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -663,7 +663,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum dtoa 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "09c3753c3db574d215cba4ea76018483895d7bff25a31b49ba45db21c48e50ab"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum embedded-hal 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "684b1fa3196f78342296d04edc2a6e5d053729d1b64a819dcb072810d706e267"
-"checksum embedded-hal-mock 0.1.0 (git+https://github.com/dbrgn/embedded-hal-mock)" = "<none>"
+"checksum embedded-hal-mock 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "290ad78881a4e3c69133eec4c82b07f45244e0538f4286500c7882b0d27a6cf5"
 "checksum error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff511d5dc435d703f4971bc399647c9bc38e20cb41452e3b9feb4765419ed3f3"
 "checksum fuchsia-zircon 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2e9763c69ebaae630ba35f74888db465e49e259ba1bc0eda7d06f4a067615d82"
 "checksum fuchsia-zircon-sys 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3dcaa9ae7725d12cdb85b3ad99a434db70b468c09ded17e012d86b5c1010f7a7"
