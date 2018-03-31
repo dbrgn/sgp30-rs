@@ -1,5 +1,5 @@
-//! A platform agnostic Rust driver for the Sensirion SGP30, based on the
-//! [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
+//! A platform agnostic Rust driver for the Sensirion SGP30 gas sensor, based
+//! on the [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
 //!
 //! ## The Device
 //!

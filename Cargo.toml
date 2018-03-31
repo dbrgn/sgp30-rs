@@ -1,7 +1,25 @@
 [package]
-authors = ["Danilo Bargen <mail@dbrgn.ch>"]
 name = "sgp30"
 version = "0.1.0"
+authors = ["Danilo Bargen <mail@dbrgn.ch>"]
+documentation = "https://docs.rs/sgp30"
+repository = "https://github.com/dbrgn/sgp30-rs"
+license = "MIT OR Apache-2.0"
+description = "Platform agnostic Rust driver for the Sensirion SGP30 gas sensor."
+readme = "README.md"
+keywords = ["sgp30", "sensirion", "driver", "gas", "tvoc", "embedded-hal-driver"]
+categories = ["embedded", "hardware-support", "no-std"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+]
+
+[features]
+default = []
 
 [dependencies]
 byteorder = "1.0"
@@ -14,6 +32,3 @@ embedded-hal-mock = { git = "https://github.com/dbrgn/embedded-hal-mock" }
 
 [profile.release]
 lto = true
-
-[features]
-default = []
