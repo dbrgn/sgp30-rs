@@ -21,7 +21,7 @@ Datasheet: https://www.sensirion.com/file/datasheet_sgp30
 - [x] Get and set baseline
 - [x] Set humidity
 - [x] Get feature set
-- [ ] Get raw signals
+- [x] Get raw signals
 - [x] Get serial number
 - [x] Support on-chip self-test
 - [x] CRC checks

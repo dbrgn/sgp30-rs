@@ -46,6 +46,8 @@ pub enum Command {
     InitAirQuality,
     /// Get a current air quality measurement.
     MeasureAirQuality,
+    /// Measure raw signals.
+    MeasureRawSignals,
     /// Return the baseline value.
     GetBaseline,
     /// Set the baseline value.
@@ -63,6 +65,7 @@ impl Command {
             Command::SelfTest => [0x20, 0x32],
             Command::InitAirQuality => [0x20, 0x03],
             Command::MeasureAirQuality => [0x20, 0x08],
+            Command::MeasureRawSignals => [0x20, 0x50],
             Command::GetBaseline => [0x20, 0x15],
             Command::SetBaseline => [0x20, 0x1E],
             Command::SetHumidity => [0x20, 0x61],
@@ -280,6 +283,34 @@ where
         Ok((co2eq_ppm, tvoc_ppb))
     }
 
+    /// Return sensor raw signals.
+    ///
+    /// This command is intended for part verification and testing purposes. It
+    /// returns the raw signals which are used as inputs for the on-chip
+    /// calibration and baseline compensation algorithm. The command performs a
+    /// measurement to which the sensor responds with the two signals for H2
+    /// and Ethanol.
+    pub fn measure_raw_signals(&mut self) -> Result<(u16, u16), Error<E>> {
+        if !self.initialized {
+            // Measurements weren't initialized
+            return Err(Error::NotInitialized);
+        }
+
+        // Send command to sensor
+        self.send_command(Command::MeasureRawSignals)?;
+
+        // Max duration according to datasheet (Table 10)
+        self.delay.delay_ms(25);
+
+        // Read result
+        let mut buf = [0; 6];
+        self.read_with_crc(&mut buf)?;
+        let h2_signal = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
+        let ethanol_signal = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
+
+        Ok((h2_signal, ethanol_signal))
+    }
+
     /// Return the baseline values of the baseline correction algorithm.
     ///
     /// The SGP30 provides the possibility to read and write the baseline
@@ -344,9 +375,9 @@ where
     /// Set the humidity value for the baseline correction algorithm.
     ///
     /// The SGP30 features an on-chip humidity compensation for the air quality
-    /// signals (CO₂eq and TVOC) and sensor raw signals (H2-signal and
-    /// Ethanol-signal). To use the on-chip humidity compensation an absolute
-    /// humidity value from an external humidity sensor is required.
+    /// signals (CO₂eq and TVOC) and sensor raw signals (H2 and Ethanol). To
+    /// use the on-chip humidity compensation an absolute humidity value from
+    /// an external humidity sensor is required.
     ///
     /// After setting a new humidity value, this value will be used by the
     /// on-chip humidity compensation algorithm until a new humidity value is
@@ -607,5 +638,17 @@ mod tests {
         let feature_set = sgp.get_feature_set().unwrap();
         assert_eq!(feature_set.product_type, ProductType::Sgp30);
         assert_eq!(feature_set.product_version, 0x42);
+    }
+
+    /// Test the `measure_raw_signals` function.
+    #[test]
+    fn measure_raw_signals() {
+        let mut dev = hal::I2cMock::new();
+        dev.set_read_data(&[0x12, 0x34, 0x37, 0x56, 0x78, 0x7D]);
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        sgp.init().unwrap();
+        let (h2, ethanol) = sgp.measure_raw_signals().unwrap();
+        assert_eq!(h2, (0x12 << 8) + 0x34);
+        assert_eq!(ethanol, (0x56 << 8) + 0x78);
     }
 }
