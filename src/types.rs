@@ -1,4 +1,5 @@
-use core::f32;
+#[allow(unused_imports)] // Required for no_std
+use num_traits::float::FloatCore;
 
 /// A measurement result from the sensor.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -148,6 +149,8 @@ impl FeatureSet {
 
 #[cfg(test)]
 mod tests {
+    use core::f32;
+
     use super::*;
 
     #[test]

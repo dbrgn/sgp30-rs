@@ -22,9 +22,10 @@ include = [
 default = []
 
 [dependencies]
-byteorder = "1.0"
+byteorder = { version = "1", default-features = false }
+clippy = { version = "0.0.191", optional = true }
 embedded-hal = "0.1"
-clippy = {version = "0.0.191", optional = true}
+num-traits = { version = "0.2", default-features = false }
 
 [dev-dependencies]
 linux-embedded-hal = "0.1"

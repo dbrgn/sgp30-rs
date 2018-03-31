@@ -179,6 +179,7 @@
 
 extern crate byteorder;
 extern crate embedded_hal as hal;
+extern crate num_traits;
 
 use byteorder::{BigEndian, ByteOrder};
 use hal::blocking::delay::{DelayMs, DelayUs};
