@@ -31,6 +31,7 @@ fn main() {
     println!("Starting SGP30 tests.");
     println!();
     println!("Serial: {:?}", sgp.serial().unwrap());
+    println!("Feature set: {:?}", sgp.get_feature_set().unwrap());
     println!("Self-Test: {}", if sgp.selftest().unwrap() { "Pass" } else { "Fail" });
     println!();
     println!("Initializing...");

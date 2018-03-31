@@ -16,7 +16,7 @@ use hal::blocking::i2c::{Read, Write, WriteRead};
 /// Measurement types used in the Sgp30 crate.
 pub mod types;
 
-use types::Humidity;
+use types::{Humidity, FeatureSet};
 
 
 const CRC8_POLYNOMIAL: u8 = 0x31;
@@ -52,6 +52,8 @@ pub enum Command {
     SetBaseline,
     /// Set the current relative humidity.
     SetHumidity,
+    /// Set the feature set.
+    GetFeatureSet,
 }
 
 impl Command {
@@ -64,6 +66,7 @@ impl Command {
             Command::GetBaseline => [0x20, 0x15],
             Command::SetBaseline => [0x20, 0x1E],
             Command::SetHumidity => [0x20, 0x61],
+            Command::GetFeatureSet => [0x20, 0x2F],
         }
     }
 }
@@ -373,6 +376,25 @@ where
         self.delay.delay_ms(10);
 
         Ok(())
+    }
+
+    /// Get the feature set.
+    ///
+    /// The SGP30 features a versioning system for the available set of
+    /// measurement commands and on-chip algorithms. This so called feature set
+    /// version number can be read out with this method.
+    pub fn get_feature_set(&mut self) -> Result<FeatureSet, Error<E>> {
+        // Send command to sensor
+        self.send_command(Command::GetFeatureSet)?;
+
+        // Max duration according to datasheet (Table 10)
+        self.delay.delay_ms(2);
+
+        // Read result
+        let mut buf = [0; 3];
+        self.read_with_crc(&mut buf)?;
+
+        Ok(FeatureSet::parse(buf[0], buf[1]))
     }
 }
 
