@@ -1,4 +1,175 @@
-//! SGP30
+//! A platform agnostic Rust driver for the Sensirion SGP30, based on the
+//! [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
+//!
+//! ## The Device
+//!
+//! The Sensirion SGP30 is a low-power gas sensor for indoor air quality
+//! applications with good long-term stability. It has an I²C interface with TVOC
+//! (*Total Volatile Organic Compounds*) and CO₂ equivalent signals.
+//!
+//! - [Datasheet](https://www.sensirion.com/file/datasheet_sgp30)
+//! - [Product Page](https://www.sensirion.com/sgp)
+//!
+//! ## Usage
+//!
+//! ### Instantiating
+//!
+//! Import this crate and an `embedded_hal` implementation, then instantiate
+//! the device:
+//!
+//! ```no_run
+//! extern crate linux_embedded_hal as hal;
+//! extern crate sgp30;
+//!
+//! use hal::{Delay, I2cdev};
+//! use sgp30::Sgp30;
+//!
+//! # fn main() {
+//! let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! let address = 0x58;
+//! let mut sgp = Sgp30::new(dev, address, Delay);
+//! # }
+//! ```
+//!
+//! ### Fetching Device Information
+//!
+//! You can fetch the serial number of your sensor as well as the [feature
+//! set](struct.FeatureSet.html):
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate sgp30;
+//! # use hal::{Delay, I2cdev};
+//! # use sgp30::Sgp30;
+//! use sgp30::FeatureSet;
+//!
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let mut sgp = Sgp30::new(dev, 0x58, Delay);
+//! let serial_number: [u8; 6] = sgp.serial().unwrap();
+//! let feature_set: FeatureSet = sgp.get_feature_set().unwrap();
+//! # }
+//! ```
+//!
+//! ### Doing Measurements
+//!
+//! Before you do any measurements, you need to initialize the sensor.
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate sgp30;
+//! # use hal::{Delay, I2cdev};
+//! # use sgp30::Sgp30;
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let mut sgp = Sgp30::new(dev, 0x58, Delay);
+//! sgp.init().unwrap();
+//! # }
+//! ```
+//!
+//! The SGP30 uses a dynamic baseline compensation algorithm and on-chip
+//! calibration parameters to provide two complementary air quality signals.
+//! Calling this method starts the air quality measurement. **After
+//! initializing the measurement, the `measure()` method must be called in
+//! regular intervals of 1 second** to ensure proper operation of the dynamic
+//! baseline compensation algorithm. It is the responsibility of the user of
+//! this driver to ensure that these periodic measurements are being done!
+//!
+//! ```no_run
+//! # extern crate embedded_hal;
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate sgp30;
+//! # use hal::I2cdev;
+//! # use sgp30::Sgp30;
+//! use embedded_hal::blocking::delay::DelayMs;
+//! use hal::Delay;
+//! use sgp30::Measurement;
+//!
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let mut sgp = Sgp30::new(dev, 0x58, Delay);
+//! # sgp.init().unwrap();
+//! loop {
+//!     let measurement: Measurement = sgp.measure().unwrap();
+//!     println!("CO₂eq parts per million: {}", measurement.co2eq_ppm);
+//!     println!("TVOC parts per billion: {}", measurement.tvoc_ppb);
+//!     Delay.delay_ms(1000u16 - 12);
+//! }
+//! # }
+//! ```
+//!
+//! *(Note: In the example we're using a delay of 988 ms because the
+//! measurement takes up to 12 ms according to the datasheet.)*
+//!
+//! For the first 15 s after initializing the air quality measurement, the
+//! sensor is in an initialization phase during which it returns fixed
+//! values of 400 ppm CO₂eq and 0 ppb TVOC. After 15 s (15 measurements)
+//! the values should start to change.
+//!
+//! A new init command has to be sent after every power-up or soft reset.
+//!
+//! ### Restoring Baseline Values
+//!
+//! The SGP30 provides the possibility to read and write the values of the
+//! baseline correction algorithm. This feature is used to save the baseline in
+//! regular intervals on an external non-volatile memory and restore it after a
+//! new power-up or soft reset of the sensor.
+//!
+//! The [`get_baseline()`](struct.Sgp30.html#method.get_baseline) method
+//! returns the baseline values for the two air quality signals. After a
+//! power-up or soft reset, the baseline of the baseline correction algorithm
+//! can be restored by calling [`init()`](struct.Sgp30.html#method.init)
+//! followed by [`set_baseline()`](struct.Sgp30.html#method.set_baseline).
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate sgp30;
+//! # use hal::{I2cdev, Delay};
+//! # use sgp30::Sgp30;
+//! use sgp30::Baseline;
+//!
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let mut sgp = Sgp30::new(dev, 0x58, Delay);
+//! # sgp.init().unwrap();
+//! let baseline: Baseline = sgp.get_baseline().unwrap();
+//! // …
+//! sgp.init().unwrap();;
+//! sgp.set_baseline(&baseline).unwrap();
+//! # }
+//! ```
+//!
+//! ### Humidity Compensation
+//!
+//! The SGP30 features an on-chip humidity compensation for the air quality
+//! signals (CO₂eq and TVOC) and sensor raw signals (H2 and Ethanol). To use
+//! the on-chip humidity compensation, an absolute humidity value from an
+//! external humidity sensor is required.
+//!
+//! ```no_run
+//! # extern crate linux_embedded_hal as hal;
+//! # extern crate sgp30;
+//! # use hal::{I2cdev, Delay};
+//! # use sgp30::Sgp30;
+//! use sgp30::Humidity;
+//!
+//! # fn main() {
+//! # let dev = I2cdev::new("/dev/i2c-1").unwrap();
+//! # let mut sgp = Sgp30::new(dev, 0x58, Delay);
+//! // This value must be obtained from a separate humidity sensor
+//! let humidity = Humidity::from_f32(23.42).unwrap();
+//!
+//! sgp.init().unwrap();
+//! sgp.set_humidity(Some(&humidity)).unwrap();
+//! # }
+//! ```
+//!
+//! After setting a new humidity value, this value will be used by the
+//! on-chip humidity compensation algorithm until a new humidity value is
+//! set. Restarting the sensor (power-on or soft reset) or calling the
+//! function with a `None` value sets the humidity value used for
+//! compensation to its default value (11.57 g/m³) until a new humidity
+//! value is sent.
 
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
@@ -24,7 +195,7 @@ const CRC8_POLYNOMIAL: u8 = 0x31;
 /// All possible errors in this crate
 #[derive(Debug)]
 pub enum Error<E> {
-    /// I2C bus error
+    /// I²C bus error
     I2c(E),
     /// CRC checksum validation failed
     Crc,
@@ -362,7 +533,7 @@ where
     ///
     /// This function sets the baseline values for the two air quality
     /// signals.
-    pub fn set_baseline(&mut self, baseline: Baseline) -> Result<(), Error<E>> {
+    pub fn set_baseline(&mut self, baseline: &Baseline) -> Result<(), Error<E>> {
         if !self.initialized {
             // Measurements weren't initialized
             return Err(Error::NotInitialized);
@@ -384,7 +555,7 @@ where
     ///
     /// The SGP30 features an on-chip humidity compensation for the air quality
     /// signals (CO₂eq and TVOC) and sensor raw signals (H2 and Ethanol). To
-    /// use the on-chip humidity compensation an absolute humidity value from
+    /// use the on-chip humidity compensation, an absolute humidity value from
     /// an external humidity sensor is required.
     ///
     /// After setting a new humidity value, this value will be used by the
@@ -600,7 +771,7 @@ mod tests {
             co2eq: 0x1234,
             tvoc: 0x5678,
         };
-        sgp.set_baseline(baseline).unwrap();
+        sgp.set_baseline(&baseline).unwrap();
         let dev = sgp.destroy();
         assert_eq!(dev.get_last_address(), Some(0x58));
         assert_eq!(dev.get_write_data(), &[

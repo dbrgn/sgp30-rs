@@ -7,6 +7,8 @@
 This is a platform agnostic Rust driver for the Sensirion SGP30, based on the
 [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
 
+Docs: https://docs.rs/sgp30
+
 ## The Device
 
 The Sensirion SGP30 is a low-power gas sensor for indoor air quality
@@ -25,8 +27,6 @@ Datasheet: https://www.sensirion.com/file/datasheet_sgp30
 - [x] Get serial number
 - [x] Support on-chip self-test
 - [x] CRC checks
-- [ ] Docs
-- [ ] Publish to crates.io
 
 ## Linting
 
