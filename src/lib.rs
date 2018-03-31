@@ -16,6 +16,8 @@ use hal::blocking::i2c::{Read, Write, WriteRead};
 /// Measurement types used in the Sgp30 crate.
 pub mod types;
 
+use types::Humidity;
+
 
 const CRC8_POLYNOMIAL: u8 = 0x31;
 
@@ -328,7 +330,7 @@ where
         let mut buf = [0; 4];
         BigEndian::write_u16(&mut buf[0..2], baseline.0);
         BigEndian::write_u16(&mut buf[2..4], baseline.1);
-        self.send_command_and_data(Command::GetBaseline, &buf)?;
+        self.send_command_and_data(Command::SetBaseline, &buf)?;
 
         // Max duration according to datasheet (Table 10)
         self.delay.delay_ms(10);
@@ -486,5 +488,20 @@ mod tests {
         let (co2eq_baseline, tvoc_baseline) = sgp.measure().unwrap();
         assert_eq!(co2eq_baseline, 4_660);
         assert_eq!(tvoc_baseline, 54_274);
+    }
+
+    /// Test the `set_baseline` function
+    #[test]
+    fn set_baseline() {
+        let dev = hal::I2cMock::new();
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        sgp.init().unwrap();
+        sgp.set_baseline((0x1234, 0x5678)).unwrap();
+        let dev = sgp.destroy();
+        assert_eq!(dev.get_last_address(), Some(0x58));
+        assert_eq!(dev.get_write_data(), &[
+            /* command: */ 0x20, 0x1E,
+            /* data + crc8: */ 0x12, 0x34, 0x37, 0x56, 0x78, 0x7D,
+        ]);
     }
 }
