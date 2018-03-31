@@ -95,6 +95,11 @@ where
         }
     }
 
+    /// Destroy driver instance, return I²C bus instance.
+    pub fn destroy(self) -> I2C {
+        self.i2c
+    }
+
     /// Write an I²C command to the sensor.
     fn send_command(&mut self, command: Command) -> Result<(), Error<E>> {
         self.i2c
