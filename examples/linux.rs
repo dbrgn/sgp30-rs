@@ -14,13 +14,13 @@ fn measure_loop(sgp: &mut Sgp30<I2cdev, Delay>) -> ! {
             Delay.delay_ms(1000u16 - 12 - 25);
         }
         if i % 10 == 0 {
-            let (co2eq_baseline, tvoc_baseline) = sgp.get_baseline().unwrap();
-            println!("Baseline: {} / {}", co2eq_baseline, tvoc_baseline);
+            let baseline = sgp.get_baseline().unwrap();
+            println!("Baseline: {} / {}", baseline.co2eq, baseline.tvoc);
         }
-        let (co2eq, tvoc) = sgp.measure().unwrap();
-        let (h2, ethanol) = sgp.measure_raw_signals().unwrap();
+        let measurements = sgp.measure().unwrap();
+        let signals = sgp.measure_raw_signals().unwrap();
         println!("{}: CO₂eq = {} ppm, TVOC = {} ppb, H2 sig = {}, Ethanol sig = {}",
-                 i + 1, co2eq, tvoc, h2, ethanol);
+                 i + 1, measurements.co2eq_ppm, measurements.tvoc_ppb, signals.h2, signals.ethanol);
         i += 1;
     }
 }

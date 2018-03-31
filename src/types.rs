@@ -1,5 +1,32 @@
 use core::f32;
 
+/// A measurement result from the sensor.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Measurement {
+    /// CO₂ equivalent (parts per million, ppm)
+	pub co2eq_ppm: u16,
+    /// Total Volatile Organic Compounds (parts per billion, ppb)
+	pub tvoc_ppb: u16,
+}
+
+/// A raw signals result from the sensor.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct RawSignals {
+    /// H2 signal
+	pub h2: u16,
+    /// Ethanol signal
+	pub ethanol: u16,
+}
+
+/// The baseline values..
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Baseline {
+    /// CO₂eq baseline
+	pub co2eq: u16,
+    /// TVOC baseline
+	pub tvoc: u16,
+}
+
 /// Absolute humidity in g/m³.
 ///
 /// Internally this is represented as a 8.8bit fixed-point number.

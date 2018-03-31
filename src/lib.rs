@@ -13,10 +13,9 @@ use byteorder::{BigEndian, ByteOrder};
 use hal::blocking::delay::{DelayMs, DelayUs};
 use hal::blocking::i2c::{Read, Write, WriteRead};
 
-/// Measurement types used in the Sgp30 crate.
-pub mod types;
+mod types;
 
-use types::{Humidity, FeatureSet};
+pub use types::{Measurement, RawSignals, Baseline, Humidity, FeatureSet};
 
 
 const CRC8_POLYNOMIAL: u8 = 0x31;
@@ -262,7 +261,7 @@ where
     /// sensor is in an initialization phase during which it returns fixed
     /// values of 400 ppm CO₂eq and 0 ppb TVOC. After 15 s (15 measurements)
     /// the values should start to change.
-    pub fn measure(&mut self) -> Result<(u16, u16), Error<E>> {
+    pub fn measure(&mut self) -> Result<Measurement, Error<E>> {
         if !self.initialized {
             // Measurements weren't initialized
             return Err(Error::NotInitialized);
@@ -280,7 +279,10 @@ where
         let co2eq_ppm = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
         let tvoc_ppb = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
 
-        Ok((co2eq_ppm, tvoc_ppb))
+        Ok(Measurement {
+            co2eq_ppm,
+            tvoc_ppb,
+        })
     }
 
     /// Return sensor raw signals.
@@ -290,7 +292,7 @@ where
     /// calibration and baseline compensation algorithm. The command performs a
     /// measurement to which the sensor responds with the two signals for H2
     /// and Ethanol.
-    pub fn measure_raw_signals(&mut self) -> Result<(u16, u16), Error<E>> {
+    pub fn measure_raw_signals(&mut self) -> Result<RawSignals, Error<E>> {
         if !self.initialized {
             // Measurements weren't initialized
             return Err(Error::NotInitialized);
@@ -308,7 +310,10 @@ where
         let h2_signal = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
         let ethanol_signal = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
 
-        Ok((h2_signal, ethanol_signal))
+        Ok(RawSignals {
+            h2: h2_signal,
+            ethanol: ethanol_signal,
+        })
     }
 
     /// Return the baseline values of the baseline correction algorithm.
@@ -324,7 +329,7 @@ where
     /// algorithm can be restored by calling
     /// [`init()`](struct.Sgp30.html#method.init) followed by
     /// [`set_baseline()`](struct.Sgp30.html#method.set_baseline).
-    pub fn get_baseline(&mut self) -> Result<(u16, u16), Error<E>> {
+    pub fn get_baseline(&mut self) -> Result<Baseline, Error<E>> {
         // Send command to sensor
         self.send_command(Command::GetBaseline)?;
 
@@ -337,7 +342,10 @@ where
         let co2eq_baseline = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
         let tvoc_baseline = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
 
-        Ok((co2eq_baseline, tvoc_baseline))
+        Ok(Baseline {
+            co2eq: co2eq_baseline,
+            tvoc: tvoc_baseline,
+        })
     }
 
     /// Set the baseline values for the baseline correction algorithm.
@@ -354,7 +362,7 @@ where
     ///
     /// This function sets the baseline values for the two air quality
     /// signals.
-    pub fn set_baseline(&mut self, baseline: (u16, u16)) -> Result<(), Error<E>> {
+    pub fn set_baseline(&mut self, baseline: Baseline) -> Result<(), Error<E>> {
         if !self.initialized {
             // Measurements weren't initialized
             return Err(Error::NotInitialized);
@@ -362,8 +370,8 @@ where
 
         // Send command and data to sensor
         let mut buf = [0; 4];
-        BigEndian::write_u16(&mut buf[0..2], baseline.0);
-        BigEndian::write_u16(&mut buf[2..4], baseline.1);
+        BigEndian::write_u16(&mut buf[0..2], baseline.co2eq);
+        BigEndian::write_u16(&mut buf[2..4], baseline.tvoc);
         self.send_command_and_data(Command::SetBaseline, &buf)?;
 
         // Max duration according to datasheet (Table 10)
@@ -565,9 +573,9 @@ mod tests {
         dev.set_read_data(&[0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]);
         let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
         sgp.init().unwrap();
-        let (co2eq, tvoc) = sgp.measure().unwrap();
-        assert_eq!(co2eq, 4_660);
-        assert_eq!(tvoc, 54_274);
+        let measurements = sgp.measure().unwrap();
+        assert_eq!(measurements.co2eq_ppm, 4_660);
+        assert_eq!(measurements.tvoc_ppb, 54_274);
     }
 
     /// Test the `get_baseline` function
@@ -577,9 +585,9 @@ mod tests {
         dev.set_read_data(&[0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]);
         let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
         sgp.init().unwrap();
-        let (co2eq_baseline, tvoc_baseline) = sgp.measure().unwrap();
-        assert_eq!(co2eq_baseline, 4_660);
-        assert_eq!(tvoc_baseline, 54_274);
+        let baseline = sgp.get_baseline().unwrap();
+        assert_eq!(baseline.co2eq, 4_660);
+        assert_eq!(baseline.tvoc, 54_274);
     }
 
     /// Test the `set_baseline` function
@@ -588,7 +596,11 @@ mod tests {
         let dev = hal::I2cMock::new();
         let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
         sgp.init().unwrap();
-        sgp.set_baseline((0x1234, 0x5678)).unwrap();
+        let baseline = Baseline {
+            co2eq: 0x1234,
+            tvoc: 0x5678,
+        };
+        sgp.set_baseline(baseline).unwrap();
         let dev = sgp.destroy();
         assert_eq!(dev.get_last_address(), Some(0x58));
         assert_eq!(dev.get_write_data(), &[
@@ -647,8 +659,8 @@ mod tests {
         dev.set_read_data(&[0x12, 0x34, 0x37, 0x56, 0x78, 0x7D]);
         let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
         sgp.init().unwrap();
-        let (h2, ethanol) = sgp.measure_raw_signals().unwrap();
-        assert_eq!(h2, (0x12 << 8) + 0x34);
-        assert_eq!(ethanol, (0x56 << 8) + 0x78);
+        let signals = sgp.measure_raw_signals().unwrap();
+        assert_eq!(signals.h2, (0x12 << 8) + 0x34);
+        assert_eq!(signals.ethanol, (0x56 << 8) + 0x78);
     }
 }
