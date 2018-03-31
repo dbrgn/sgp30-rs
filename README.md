@@ -19,7 +19,7 @@ Datasheet: https://www.sensirion.com/file/datasheet_sgp30
 
 - [x] Measure air quality
 - [x] Get and set baseline
-- [ ] Set humidity
+- [x] Set humidity
 - [ ] Get feature set version
 - [ ] Get raw signals
 - [x] Get serial number

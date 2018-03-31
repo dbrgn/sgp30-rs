@@ -337,6 +337,43 @@ where
 
         Ok(())
     }
+
+    /// Set the humidity value for the baseline correction algorithm.
+    ///
+    /// The SGP30 features an on-chip humidity compensation for the air quality
+    /// signals (CO₂eq and TVOC) and sensor raw signals (H2-signal and
+    /// Ethanol-signal). To use the on-chip humidity compensation an absolute
+    /// humidity value from an external humidity sensor is required.
+    ///
+    /// After setting a new humidity value, this value will be used by the
+    /// on-chip humidity compensation algorithm until a new humidity value is
+    /// set. Restarting the sensor (power-on or soft reset) or calling the
+    /// function with a `None` value sets the humidity value used for
+    /// compensation to its default value (11.57 g/m³) until a new humidity
+    /// value is sent.
+    ///
+    /// Before calling this method, the air quality measurements must have been
+    /// initialized using the [`init()`](struct.Sgp30.html#method.init) method.
+    /// Otherwise an [`Error::NotInitialized`](enum.Error.html#variant.NotInitialized)
+    /// will be returned.
+    pub fn set_humidity(&mut self, humidity: Option<&Humidity>) -> Result<(), Error<E>> {
+        if !self.initialized {
+            // Measurements weren't initialized
+            return Err(Error::NotInitialized);
+        }
+
+        // Send command and data to sensor
+        let buf = match humidity {
+            Some(humi) => humi.as_bytes(),
+            None => [0, 0],
+        };
+        self.send_command_and_data(Command::SetHumidity, &buf)?;
+
+        // Max duration according to datasheet (Table 10)
+        self.delay.delay_ms(10);
+
+        Ok(())
+    }
 }
 
 /// Calculate the CRC8 checksum.
@@ -502,6 +539,37 @@ mod tests {
         assert_eq!(dev.get_write_data(), &[
             /* command: */ 0x20, 0x1E,
             /* data + crc8: */ 0x12, 0x34, 0x37, 0x56, 0x78, 0x7D,
+        ]);
+    }
+
+    /// Test the `set_humidity` function
+    #[test]
+    fn set_humidity() {
+        let dev = hal::I2cMock::new();
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        sgp.init().unwrap();
+        let humidity = Humidity::from_f32(15.5).unwrap();
+        sgp.set_humidity(Some(&humidity)).unwrap();
+        let dev = sgp.destroy();
+        assert_eq!(dev.get_last_address(), Some(0x58));
+        assert_eq!(dev.get_write_data(), &[
+            /* command: */ 0x20, 0x61,
+            /* data + crc8: */ 0x0F, 0x80, 0x62,
+        ]);
+    }
+
+    /// Test the `set_humidity` function with a None value
+    #[test]
+    fn set_humidity_none() {
+        let dev = hal::I2cMock::new();
+        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        sgp.init().unwrap();
+        sgp.set_humidity(None).unwrap();
+        let dev = sgp.destroy();
+        assert_eq!(dev.get_last_address(), Some(0x58));
+        assert_eq!(dev.get_write_data(), &[
+            /* command: */ 0x20, 0x61,
+            /* data + crc8: */ 0x00, 0x00, 0x81,
         ]);
     }
 }
