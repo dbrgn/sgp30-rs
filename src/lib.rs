@@ -222,7 +222,7 @@ enum Command {
     GetBaseline,
     /// Set the baseline value.
     SetBaseline,
-    /// Set the current relative humidity.
+    /// Set the current absolute humidity.
     SetHumidity,
     /// Set the feature set.
     GetFeatureSet,
