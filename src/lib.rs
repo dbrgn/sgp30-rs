@@ -207,7 +207,7 @@ pub enum Error<E> {
 
 /// I²C commands sent to the sensor.
 #[derive(Debug, Copy, Clone)]
-pub enum Command {
+enum Command {
     /// Return the serial number.
     GetSerial,
     /// Run an on-chip self-test.
