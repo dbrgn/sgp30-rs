@@ -187,7 +187,7 @@ use hal::blocking::i2c::{Read, Write, WriteRead};
 
 mod types;
 
-pub use types::{Measurement, RawSignals, Baseline, Humidity, FeatureSet};
+pub use types::{Measurement, RawSignals, Baseline, Humidity, FeatureSet, ProductType};
 
 
 const CRC8_POLYNOMIAL: u8 = 0x31;
@@ -632,7 +632,6 @@ mod tests {
     extern crate embedded_hal_mock as hal;
 
     use super::*;
-    use super::types::ProductType;
 
     /// Test the crc8 function against the test value provided in the
     /// datasheet (section 6.6).
