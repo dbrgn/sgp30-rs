@@ -228,8 +228,8 @@ enum Command {
 }
 
 impl Command {
-    fn as_bytes(&self) -> [u8; 2] {
-        match *self {
+    fn as_bytes(self) -> [u8; 2] {
+        match self {
             Command::GetSerial => [0x36, 0x82],
             Command::SelfTest => [0x20, 0x32],
             Command::InitAirQuality => [0x20, 0x03],

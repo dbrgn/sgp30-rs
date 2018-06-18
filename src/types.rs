@@ -75,9 +75,7 @@ impl Humidity {
             return Err(HumidityError::OutOfRange);
         }
 
-        let integer = if val >= 256.0 {
-            return Err(HumidityError::OutOfRange);
-        } else if val < 0.0 {
+        let integer = if val >= 256.0 || val < 0.0 {
             return Err(HumidityError::OutOfRange);
         } else {
             val.trunc() as u8
@@ -105,7 +103,7 @@ impl Humidity {
 impl Into<f32> for Humidity {
     /// Convert a `Humidity` instance to a f32.
     fn into(self) -> f32 {
-        self.integer as f32 + (self.fractional as f32 / 256.0)
+        f32::from(self.integer) + (f32::from(self.fractional) / 256.0)
     }
 }
 
