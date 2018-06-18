@@ -29,13 +29,6 @@ Datasheet: https://www.sensirion.com/file/datasheet_sgp30
 - [x] CRC checks
 - [x] Docs
 
-## Linting
-
-To run clippy lints, compile the library with `--features clippy` on a nightly
-compiler:
-
-    $ cargo build --features clippy
-
 ## License
 
 Licensed under either of

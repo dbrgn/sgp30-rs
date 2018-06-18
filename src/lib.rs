@@ -174,8 +174,6 @@
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 #![no_std]
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
 
 extern crate byteorder;
 extern crate embedded_hal as hal;
