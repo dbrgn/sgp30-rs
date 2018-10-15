@@ -147,7 +147,7 @@ impl FeatureSet {
 
 #[cfg(test)]
 mod tests {
-    use core::f32;
+    use std::f32;
 
     use super::*;
 
