@@ -539,12 +539,9 @@ where
         }
 
         // Send command and data to sensor
+        // Note that the order of the two parameters is inverted when writing
+        // compared to when reading.
         let mut buf = [0; 4];
-        //According to the docs:
-        // After a power-up or soft reset, the baseline of the baseline compensation
-        // algorithm can be restored by sending first an "Init_air_quality” command
-        // followed by a “Set_baseline” command with the two baseline values as
-        // parameters in the order as (TVOC, CO2eq).
         BigEndian::write_u16(&mut buf[0..2], baseline.tvoc);
         BigEndian::write_u16(&mut buf[2..4], baseline.co2eq);
         self.send_command_and_data(Command::SetBaseline, &buf)?;
