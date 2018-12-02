@@ -173,7 +173,7 @@
 
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 extern crate byteorder;
 extern crate embedded_hal as hal;
@@ -632,6 +632,8 @@ mod tests {
     extern crate embedded_hal_mock as hal;
 
     use super::*;
+    use self::hal::delay::MockNoop as DelayMock;
+    use self::hal::i2c::{Mock as I2cMock, Transaction};
 
     /// Test the crc8 function against the test value provided in the
     /// datasheet (section 6.6).
@@ -643,8 +645,8 @@ mod tests {
     /// Test the `validate_crc` function.
     #[test]
     fn validate_crc() {
-        let dev = hal::I2cMock::new();
-        let sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let mock = I2cMock::new(&[]);
+        let sgp = Sgp30::new(mock, 0x58, DelayMock);
 
         // Not enough data
         sgp.validate_crc(&[]).unwrap();
@@ -670,6 +672,8 @@ mod tests {
             Err(_) => panic!("Invalid error: Must be Crc"),
             Ok(_) => panic!("CRC check did not fail"),
         }
+
+        sgp.destroy().done();
     }
 
     /// Test the `read_with_crc` function.
@@ -678,160 +682,202 @@ mod tests {
         let mut buf = [0; 3];
 
         // Valid CRC
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0xbe, 0xef, 0x92]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::read(0x58, vec![0xBE, 0xEF, 0x92]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.read_with_crc(&mut buf).unwrap();
         assert_eq!(buf, [0xbe, 0xef, 0x92]);
+        sgp.destroy().done();
 
         // Invalid CRC
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0xbe, 0xef, 0x00]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::read(0x58, vec![0xBE, 0xEF, 0x00]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         match sgp.read_with_crc(&mut buf) {
             Err(Error::Crc) => {},
             Err(_) => panic!("Invalid error: Must be Crc"),
             Ok(_) => panic!("CRC check did not fail"),
         }
         assert_eq!(buf, [0xbe, 0xef, 0x00]); // Buf was changed
+        sgp.destroy().done();
     }
 
     /// Test the `serial` function
     #[test]
     fn serial() {
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0, 0, 129, 0, 100, 254, 204, 130, 135]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::GetSerial.as_bytes()[..].into()),
+            Transaction::read(0x58, vec![0, 0, 129, 0, 100, 254, 204, 130, 135]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         let serial = sgp.serial().unwrap();
         assert_eq!(serial, [0, 0, 0, 100, 204, 130]);
+        sgp.destroy().done();
     }
 
     /// Test the `selftest` function
     #[test]
     fn selftest_ok() {
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0xD4, 0x00, 0xC6]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::SelfTest.as_bytes()[..].into()),
+            Transaction::read(0x58, vec![0xD4, 0x00, 0xC6]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         assert!(sgp.selftest().unwrap());
     }
 
     /// Test the `selftest` function
     #[test]
     fn selftest_fail() {
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0x12, 0x34, 0x37]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::SelfTest.as_bytes()[..].into()),
+            Transaction::read(0x58, vec![0x12, 0x34, 0x37]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         assert!(!sgp.selftest().unwrap());
     }
 
     /// Test the `measure` function: Require initialization
     #[test]
     fn measure_initialization_required() {
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let mock = I2cMock::new(&[]);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         match sgp.measure() {
             Err(Error::NotInitialized) => {},
             Ok(_) => panic!("Error::NotInitialized not returned"),
             Err(_) => panic!("Wrong error returned"),
         }
+        sgp.destroy().done();
     }
 
     /// Test the `measure` function: Calculation of return values
     #[test]
     fn measure_success() {
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, Command::MeasureAirQuality.as_bytes()[..].into()),
+            Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.init().unwrap();
         let measurements = sgp.measure().unwrap();
         assert_eq!(measurements.co2eq_ppm, 4_660);
         assert_eq!(measurements.tvoc_ppb, 54_274);
+        sgp.destroy().done();
     }
 
     /// Test the `get_baseline` function
     #[test]
     fn get_baseline() {
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, Command::GetBaseline.as_bytes()[..].into()),
+            Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.init().unwrap();
         let baseline = sgp.get_baseline().unwrap();
         assert_eq!(baseline.co2eq, 4_660);
         assert_eq!(baseline.tvoc, 54_274);
+        sgp.destroy().done();
     }
 
     /// Test the `set_baseline` function
     #[test]
     fn set_baseline() {
-        let dev = hal::I2cMock::new();
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, vec![
+                /* command: */ 0x20, 0x1E,
+                /* data + crc8: */ 0x56, 0x78, 0x7D, 0x12, 0x34, 0x37,
+            ]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.init().unwrap();
         let baseline = Baseline {
             co2eq: 0x1234,
             tvoc: 0x5678,
         };
         sgp.set_baseline(&baseline).unwrap();
-        let dev = sgp.destroy();
-        assert_eq!(dev.get_last_address(), Some(0x58));
-        assert_eq!(dev.get_write_data(), &[
-            /* command: */ 0x20, 0x1E,
-            /* data + crc8: */ 0x56, 0x78, 0x7D, 0x12, 0x34, 0x37,
-        ]);
+        sgp.destroy().done();
     }
 
     /// Test the `set_humidity` function
     #[test]
     fn set_humidity() {
-        let dev = hal::I2cMock::new();
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, vec![
+                /* command: */ 0x20, 0x61,
+                /* data + crc8: */ 0x0F, 0x80, 0x62,
+            ]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.init().unwrap();
         let humidity = Humidity::from_f32(15.5).unwrap();
         sgp.set_humidity(Some(&humidity)).unwrap();
-        let dev = sgp.destroy();
-        assert_eq!(dev.get_last_address(), Some(0x58));
-        assert_eq!(dev.get_write_data(), &[
-            /* command: */ 0x20, 0x61,
-            /* data + crc8: */ 0x0F, 0x80, 0x62,
-        ]);
+        sgp.destroy().done();
     }
 
     /// Test the `set_humidity` function with a None value
     #[test]
     fn set_humidity_none() {
-        let dev = hal::I2cMock::new();
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, vec![
+                /* command: */ 0x20, 0x61,
+                /* data + crc8: */ 0x00, 0x00, 0x81,
+            ]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.init().unwrap();
         sgp.set_humidity(None).unwrap();
-        let dev = sgp.destroy();
-        assert_eq!(dev.get_last_address(), Some(0x58));
-        assert_eq!(dev.get_write_data(), &[
-            /* command: */ 0x20, 0x61,
-            /* data + crc8: */ 0x00, 0x00, 0x81,
-        ]);
+        sgp.destroy().done();
     }
 
     /// Test the `get_feature_set` function.
     #[test]
     fn get_feature_set() {
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0b00000000, 0x42, 0xDE]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, Command::GetFeatureSet.as_bytes()[..].into()),
+            Transaction::read(0x58, vec![0x00, 0x42, 0xDE]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.init().unwrap();
         let feature_set = sgp.get_feature_set().unwrap();
         assert_eq!(feature_set.product_type, ProductType::Sgp30);
         assert_eq!(feature_set.product_version, 0x42);
+        sgp.destroy().done();
     }
 
     /// Test the `measure_raw_signals` function.
     #[test]
     fn measure_raw_signals() {
-        let mut dev = hal::I2cMock::new();
-        dev.set_read_data(&[0x12, 0x34, 0x37, 0x56, 0x78, 0x7D]);
-        let mut sgp = Sgp30::new(dev, 0x58, hal::DelayMockNoop);
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, Command::MeasureRawSignals.as_bytes()[..].into()),
+            Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0x56, 0x78, 0x7D]),
+        ];
+        let mock = I2cMock::new(&expectations);
+        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.init().unwrap();
         let signals = sgp.measure_raw_signals().unwrap();
         assert_eq!(signals.h2, (0x12 << 8) + 0x34);
         assert_eq!(signals.ethanol, (0x56 << 8) + 0x78);
+        sgp.destroy().done();
     }
 }
