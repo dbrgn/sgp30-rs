@@ -99,7 +99,8 @@
 //! ```
 //!
 //! *(Note: In the example we're using a delay of 988 ms because the
-//! measurement takes up to 12 ms according to the datasheet.)*
+//! measurement takes up to 12 ms according to the datasheet. In reality, it
+//! would be better to use a timer-based approach instead.)*
 //!
 //! For the first 15 s after initializing the air quality measurement, the
 //! sensor is in an initialization phase during which it returns fixed
