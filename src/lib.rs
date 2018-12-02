@@ -539,9 +539,11 @@ where
         }
 
         // Send command and data to sensor
+        // Note that the order of the two parameters is inverted when writing
+        // compared to when reading.
         let mut buf = [0; 4];
-        BigEndian::write_u16(&mut buf[0..2], baseline.co2eq);
-        BigEndian::write_u16(&mut buf[2..4], baseline.tvoc);
+        BigEndian::write_u16(&mut buf[0..2], baseline.tvoc);
+        BigEndian::write_u16(&mut buf[2..4], baseline.co2eq);
         self.send_command_and_data(Command::SetBaseline, &buf)?;
 
         // Max duration according to datasheet (Table 10)
@@ -774,7 +776,7 @@ mod tests {
         assert_eq!(dev.get_last_address(), Some(0x58));
         assert_eq!(dev.get_write_data(), &[
             /* command: */ 0x20, 0x1E,
-            /* data + crc8: */ 0x12, 0x34, 0x37, 0x56, 0x78, 0x7D,
+            /* data + crc8: */ 0x56, 0x78, 0x7D, 0x12, 0x34, 0x37,
         ]);
     }
 
