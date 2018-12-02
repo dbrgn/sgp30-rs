@@ -779,7 +779,7 @@ mod tests {
         assert_eq!(dev.get_last_address(), Some(0x58));
         assert_eq!(dev.get_write_data(), &[
             /* command: */ 0x20, 0x1E,
-            /* data + crc8: */ 0x12, 0x34, 0x37, 0x56, 0x78, 0x7D,
+            /* data + crc8: */ 0x56, 0x78, 0x7D, 0x12, 0x34, 0x37,
         ]);
     }
 
