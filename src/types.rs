@@ -19,7 +19,7 @@ pub struct RawSignals {
 	pub ethanol: u16,
 }
 
-/// The baseline values..
+/// The baseline values.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Baseline {
     /// CO₂eq baseline
