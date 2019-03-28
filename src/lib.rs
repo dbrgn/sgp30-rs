@@ -135,7 +135,7 @@
 //! # sgp.init().unwrap();
 //! let baseline: Baseline = sgp.get_baseline().unwrap();
 //! // …
-//! sgp.init().unwrap();;
+//! sgp.init().unwrap();
 //! sgp.set_baseline(&baseline).unwrap();
 //! # }
 //! ```
