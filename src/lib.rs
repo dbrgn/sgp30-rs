@@ -18,8 +18,7 @@
 //! the device:
 //!
 //! ```no_run
-//! extern crate linux_embedded_hal as hal;
-//! extern crate sgp30;
+//! use linux_embedded_hal as hal;
 //!
 //! use hal::{Delay, I2cdev};
 //! use sgp30::Sgp30;
@@ -37,8 +36,7 @@
 //! set](struct.FeatureSet.html):
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate sgp30;
+//! # use linux_embedded_hal as hal;
 //! # use hal::{Delay, I2cdev};
 //! # use sgp30::Sgp30;
 //! use sgp30::FeatureSet;
@@ -56,8 +54,7 @@
 //! Before you do any measurements, you need to initialize the sensor.
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate sgp30;
+//! # use linux_embedded_hal as hal;
 //! # use hal::{Delay, I2cdev};
 //! # use sgp30::Sgp30;
 //! # fn main() {
@@ -76,9 +73,7 @@
 //! this driver to ensure that these periodic measurements are being done!
 //!
 //! ```no_run
-//! # extern crate embedded_hal;
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate sgp30;
+//! # use linux_embedded_hal as hal;
 //! # use hal::I2cdev;
 //! # use sgp30::Sgp30;
 //! use embedded_hal::blocking::delay::DelayMs;
@@ -123,8 +118,7 @@
 //! followed by [`set_baseline()`](struct.Sgp30.html#method.set_baseline).
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate sgp30;
+//! # use linux_embedded_hal as hal;
 //! # use hal::{I2cdev, Delay};
 //! # use sgp30::Sgp30;
 //! use sgp30::Baseline;
@@ -148,8 +142,7 @@
 //! external humidity sensor is required.
 //!
 //! ```no_run
-//! # extern crate linux_embedded_hal as hal;
-//! # extern crate sgp30;
+//! # use linux_embedded_hal as hal;
 //! # use hal::{I2cdev, Delay};
 //! # use sgp30::Sgp30;
 //! use sgp30::Humidity;
@@ -176,9 +169,7 @@
 #![deny(missing_docs)]
 #![cfg_attr(not(test), no_std)]
 
-extern crate byteorder;
-extern crate embedded_hal as hal;
-extern crate num_traits;
+use embedded_hal as hal;
 
 use byteorder::{BigEndian, ByteOrder};
 use crate::hal::blocking::delay::{DelayMs, DelayUs};
@@ -630,7 +621,7 @@ fn crc8(data: &[u8]) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    extern crate embedded_hal_mock as hal;
+    use embedded_hal_mock as hal;
 
     use super::*;
     use self::hal::delay::MockNoop as DelayMock;

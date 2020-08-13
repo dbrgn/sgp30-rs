@@ -1,7 +1,3 @@
-extern crate embedded_hal;
-extern crate linux_embedded_hal;
-extern crate sgp30;
-
 use embedded_hal::blocking::delay::DelayMs;
 use linux_embedded_hal::{I2cdev, Delay};
 use sgp30::Sgp30;
