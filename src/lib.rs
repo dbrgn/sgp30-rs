@@ -181,12 +181,12 @@ extern crate embedded_hal as hal;
 extern crate num_traits;
 
 use byteorder::{BigEndian, ByteOrder};
-use hal::blocking::delay::{DelayMs, DelayUs};
-use hal::blocking::i2c::{Read, Write, WriteRead};
+use crate::hal::blocking::delay::{DelayMs, DelayUs};
+use crate::hal::blocking::i2c::{Read, Write, WriteRead};
 
 mod types;
 
-pub use types::{Measurement, RawSignals, Baseline, Humidity, FeatureSet, ProductType};
+pub use crate::types::{Measurement, RawSignals, Baseline, Humidity, FeatureSet, ProductType};
 
 
 const CRC8_POLYNOMIAL: u8 = 0x31;
