@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: shepmaster/rust-nightly
+      - image: rust:1.31.1
     steps:
       - checkout
 
