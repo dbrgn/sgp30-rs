@@ -28,8 +28,8 @@ embedded-hal = "0.2"
 num-traits = { version = "0.2", default-features = false }
 
 [dev-dependencies]
-linux-embedded-hal = "0.2"
-embedded-hal-mock = "0.6"
+linux-embedded-hal = "0.3"
+embedded-hal-mock = "0.7"
 
 [profile.release]
 lto = true
