@@ -5,27 +5,27 @@ use num_traits::float::FloatCore;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Measurement {
     /// CO₂ equivalent (parts per million, ppm)
-	pub co2eq_ppm: u16,
+    pub co2eq_ppm: u16,
     /// Total Volatile Organic Compounds (parts per billion, ppb)
-	pub tvoc_ppb: u16,
+    pub tvoc_ppb: u16,
 }
 
 /// A raw signals result from the sensor.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RawSignals {
     /// H2 signal
-	pub h2: u16,
+    pub h2: u16,
     /// Ethanol signal
-	pub ethanol: u16,
+    pub ethanol: u16,
 }
 
 /// The baseline values.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Baseline {
     /// CO₂eq baseline
-	pub co2eq: u16,
+    pub co2eq: u16,
     /// TVOC baseline
-	pub tvoc: u16,
+    pub tvoc: u16,
 }
 
 /// Absolute humidity in g/m³.
@@ -36,8 +36,8 @@ pub struct Baseline {
 /// constructor, or the lossy `from_f32()` method.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Humidity {
-	integer: u8, // 0-255
-	fractional: u8, // 0/256-255/256
+    integer: u8,    // 0-255
+    fractional: u8, // 0/256-255/256
 }
 
 /// Errors that can occur when constructing a `Humidity` value.
@@ -51,7 +51,7 @@ pub enum HumidityError {
 }
 
 impl Humidity {
-	/// Create a new `Humidity` instance.
+    /// Create a new `Humidity` instance.
     ///
     /// The humidity should be passed in as a 8.8bit fixed-point number.
     ///
@@ -60,14 +60,17 @@ impl Humidity {
     /// - The pair `(0x00, 0x01)` represents `1/256 g/m³` (0.00390625)
     /// - The pair `(0xFF, 0xFF)` represents `255 g/m³ + 255/256 g/m³` (255.99609375)
     /// - The pair `(0x10, 0x80)` represents `16 g/m³ + 128/256 g/m³` (16.5)
-	pub fn new(integer: u8, fractional: u8) -> Result<Self, HumidityError> {
+    pub fn new(integer: u8, fractional: u8) -> Result<Self, HumidityError> {
         if integer == 0 && fractional == 0 {
             return Err(HumidityError::ZeroValue);
         }
-		Ok(Humidity { integer, fractional })
-	}
+        Ok(Humidity {
+            integer,
+            fractional,
+        })
+    }
 
-	/// Create a new `Humidity` instance from a f32.
+    /// Create a new `Humidity` instance from a f32.
     ///
     /// When converting, the fractional part will always be rounded down.
     pub fn from_f32(val: f32) -> Result<Self, HumidityError> {
@@ -93,11 +96,11 @@ impl Humidity {
         Humidity::new(integer, fractional)
     }
 
-	/// Convert this to the binary fixed-point representation expected by the
-	/// SGP30 sensor.
+    /// Convert this to the binary fixed-point representation expected by the
+    /// SGP30 sensor.
     pub fn as_bytes(&self) -> [u8; 2] {
-		[self.integer, self.fractional]
-	}
+        [self.integer, self.fractional]
+    }
 }
 
 impl Into<f32> for Humidity {
@@ -122,7 +125,7 @@ impl ProductType {
         match val {
             0 => ProductType::Sgp30,
             _ => ProductType::Unknown(val),
-        } 
+        }
     }
 }
 
@@ -160,10 +163,22 @@ mod tests {
 
     #[test]
     fn humidity_from_f32_ok() {
-        assert_eq!(Humidity::from_f32(0.00390625f32), Ok(Humidity::new(0x00, 0x01).unwrap()));
-        assert_eq!(Humidity::from_f32(255.99609375f32), Ok(Humidity::new(0xFF, 0xFF).unwrap()));
-        assert_eq!(Humidity::from_f32(16.5f32), Ok(Humidity::new(0x10, 0x80).unwrap()));
-        assert_eq!(Humidity::from_f32(16.999999f32), Ok(Humidity::new(0x10, 0xFF).unwrap()));
+        assert_eq!(
+            Humidity::from_f32(0.00390625f32),
+            Ok(Humidity::new(0x00, 0x01).unwrap())
+        );
+        assert_eq!(
+            Humidity::from_f32(255.99609375f32),
+            Ok(Humidity::new(0xFF, 0xFF).unwrap())
+        );
+        assert_eq!(
+            Humidity::from_f32(16.5f32),
+            Ok(Humidity::new(0x10, 0x80).unwrap())
+        );
+        assert_eq!(
+            Humidity::from_f32(16.999999f32),
+            Ok(Humidity::new(0x10, 0xFF).unwrap())
+        );
     }
 
     #[test]

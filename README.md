@@ -1,8 +1,9 @@
 # Rust SGP30 Driver
 
-[![CircleCI][circle-ci-badge]][circle-ci]
+[![Build status][workflow-badge]][workflow]
 [![Crates.io Version][crates-io-badge]][crates-io]
 [![Crates.io Downloads][crates-io-download-badge]][crates-io-download]
+![No Std][no-std-badge]
 
 This is a platform agnostic Rust driver for the Sensirion SGP30 gas sensor,
 based on the [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
@@ -46,9 +47,10 @@ be dual licensed as above, without any additional terms or conditions.
 
 
 <!-- Badges -->
-[circle-ci]: https://circleci.com/gh/dbrgn/sgp30-rs/tree/master
-[circle-ci-badge]: https://circleci.com/gh/dbrgn/sgp30-rs/tree/master.svg?style=shield
+[workflow]: https://github.com/dbrgn/sgp30-rs/actions?query=workflow%3ACI
+[workflow-badge]: https://img.shields.io/github/workflow/status/dbrgn/sgp30-rs/CI/master
 [crates-io]: https://crates.io/crates/sgp30
 [crates-io-badge]: https://img.shields.io/crates/v/sgp30.svg?maxAge=3600
 [crates-io-download]: https://crates.io/crates/sgp30
 [crates-io-download-badge]: https://img.shields.io/crates/d/sgp30.svg?maxAge=3600
+[no-std-badge]: https://img.shields.io/badge/no__std-yes-blue
