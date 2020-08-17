@@ -171,17 +171,15 @@
 
 use embedded_hal as hal;
 
-use byteorder::{BigEndian, ByteOrder};
 use crate::hal::blocking::delay::{DelayMs, DelayUs};
 use crate::hal::blocking::i2c::{Read, Write, WriteRead};
+use byteorder::{BigEndian, ByteOrder};
 
 mod types;
 
-pub use crate::types::{Measurement, RawSignals, Baseline, Humidity, FeatureSet, ProductType};
-
+pub use crate::types::{Baseline, FeatureSet, Humidity, Measurement, ProductType, RawSignals};
 
 const CRC8_POLYNOMIAL: u8 = 0x31;
-
 
 /// All possible errors in this crate
 #[derive(Debug)]
@@ -194,7 +192,6 @@ pub enum Error<E> {
     /// initialization phase.
     NotInitialized,
 }
-
 
 /// I²C commands sent to the sensor.
 #[derive(Debug, Copy, Clone)]
@@ -234,7 +231,6 @@ impl Command {
         }
     }
 }
-
 
 /// Driver for the SGP30
 #[derive(Debug, Default)]
@@ -291,10 +287,12 @@ where
             buf[5..7].copy_from_slice(&data[2..4]);
             buf[7] = crc8(&data[2..4]);
         }
-        let payload = if data.len() > 2 { &buf[0..8] } else { &buf[0..5] };
-        self.i2c
-            .write(self.address, payload)
-            .map_err(Error::I2c)
+        let payload = if data.len() > 2 {
+            &buf[0..8]
+        } else {
+            &buf[0..5]
+        };
+        self.i2c.write(self.address, payload).map_err(Error::I2c)
     }
 
     /// Iterate over the provided buffer and validate the CRC8 checksum.
@@ -306,8 +304,7 @@ where
     /// validated.
     fn validate_crc(&self, buf: &[u8]) -> Result<(), Error<E>> {
         for chunk in buf.chunks(3) {
-            if chunk.len() == 3
-            && crc8(&[chunk[0], chunk[1]]) != chunk[2] {
+            if chunk.len() == 3 && crc8(&[chunk[0], chunk[1]]) != chunk[2] {
                 return Err(Error::Crc);
             }
         }
@@ -322,9 +319,7 @@ where
     /// the buffer size is not a multiple of 3, then not all data will be
     /// validated.
     fn read_with_crc(&mut self, mut buf: &mut [u8]) -> Result<(), Error<E>> {
-        self.i2c
-            .read(self.address, &mut buf)
-            .map_err(Error::I2c)?;
+        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
         self.validate_crc(buf)
     }
 
@@ -340,11 +335,7 @@ where
         let mut buf = [0; 9];
         self.read_with_crc(&mut buf)?;
 
-        Ok([
-           buf[0], buf[1],
-           buf[3], buf[4],
-           buf[6], buf[7],
-        ])
+        Ok([buf[0], buf[1], buf[3], buf[4], buf[6], buf[7]])
     }
 
     /// Run an on-chip self-test. Return a boolean indicating whether the test succeeded.
@@ -623,9 +614,9 @@ fn crc8(data: &[u8]) -> u8 {
 mod tests {
     use embedded_hal_mock as hal;
 
-    use super::*;
     use self::hal::delay::MockNoop as DelayMock;
     use self::hal::i2c::{Mock as I2cMock, Transaction};
+    use super::*;
 
     /// Test the crc8 function against the test value provided in the
     /// datasheet (section 6.6).
@@ -650,17 +641,18 @@ mod tests {
 
         // Invalid CRC
         match sgp.validate_crc(&[0xbe, 0xef, 0x91]) {
-            Err(Error::Crc) => {},
+            Err(Error::Crc) => {}
             Err(_) => panic!("Invalid error: Must be Crc"),
             Ok(_) => panic!("CRC check did not fail"),
         }
 
         // Valid CRC (8 bytes)
-        sgp.validate_crc(&[0xbe, 0xef, 0x92, 0xbe, 0xef, 0x92, 0x00, 0x00]).unwrap();
+        sgp.validate_crc(&[0xbe, 0xef, 0x92, 0xbe, 0xef, 0x92, 0x00, 0x00])
+            .unwrap();
 
         // Invalid CRC (8 bytes)
         match sgp.validate_crc(&[0xbe, 0xef, 0x91, 0xbe, 0xef, 0xff, 0x00, 0x00]) {
-            Err(Error::Crc) => {},
+            Err(Error::Crc) => {}
             Err(_) => panic!("Invalid error: Must be Crc"),
             Ok(_) => panic!("CRC check did not fail"),
         }
@@ -674,9 +666,7 @@ mod tests {
         let mut buf = [0; 3];
 
         // Valid CRC
-        let expectations = [
-            Transaction::read(0x58, vec![0xBE, 0xEF, 0x92]),
-        ];
+        let expectations = [Transaction::read(0x58, vec![0xBE, 0xEF, 0x92])];
         let mock = I2cMock::new(&expectations);
         let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         sgp.read_with_crc(&mut buf).unwrap();
@@ -684,13 +674,11 @@ mod tests {
         sgp.destroy().done();
 
         // Invalid CRC
-        let expectations = [
-            Transaction::read(0x58, vec![0xBE, 0xEF, 0x00]),
-        ];
+        let expectations = [Transaction::read(0x58, vec![0xBE, 0xEF, 0x00])];
         let mock = I2cMock::new(&expectations);
         let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         match sgp.read_with_crc(&mut buf) {
-            Err(Error::Crc) => {},
+            Err(Error::Crc) => {}
             Err(_) => panic!("Invalid error: Must be Crc"),
             Ok(_) => panic!("CRC check did not fail"),
         }
@@ -742,7 +730,7 @@ mod tests {
         let mock = I2cMock::new(&[]);
         let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
         match sgp.measure() {
-            Err(Error::NotInitialized) => {},
+            Err(Error::NotInitialized) => {}
             Ok(_) => panic!("Error::NotInitialized not returned"),
             Err(_) => panic!("Wrong error returned"),
         }
@@ -786,6 +774,7 @@ mod tests {
     /// Test the `set_baseline` function
     #[test]
     fn set_baseline() {
+        #[rustfmt::skip]
         let expectations = [
             Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
             Transaction::write(0x58, vec![
@@ -807,6 +796,7 @@ mod tests {
     /// Test the `set_humidity` function
     #[test]
     fn set_humidity() {
+        #[rustfmt::skip]
         let expectations = [
             Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
             Transaction::write(0x58, vec![
@@ -825,6 +815,7 @@ mod tests {
     /// Test the `set_humidity` function with a None value
     #[test]
     fn set_humidity_none() {
+        #[rustfmt::skip]
         let expectations = [
             Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
             Transaction::write(0x58, vec![
