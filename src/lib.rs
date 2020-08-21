@@ -294,22 +294,6 @@ where
         self.i2c.write(self.address, payload).map_err(Error::I2c)
     }
 
-    /// Iterate over the provided buffer and validate the CRC8 checksum.
-    ///
-    /// If the checksum is wrong, return `Error::Crc`.
-    ///
-    /// Note: This method will consider every third byte a checksum byte. If
-    /// the buffer size is not a multiple of 3, then not all data will be
-    /// validated.
-    fn validate_crc(&self, buf: &[u8]) -> Result<(), Error<E>> {
-        for chunk in buf.chunks(3) {
-            if chunk.len() == 3 && crc8::calculate(&[chunk[0], chunk[1]]) != chunk[2] {
-                return Err(Error::Crc);
-            }
-        }
-        Ok(())
-    }
-
     /// Read data into the provided buffer and validate the CRC8 checksum.
     ///
     /// If the checksum is wrong, return `Error::Crc`.
@@ -319,7 +303,7 @@ where
     /// validated.
     fn read_with_crc(&mut self, mut buf: &mut [u8]) -> Result<(), Error<E>> {
         self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
-        self.validate_crc(buf)
+        crc8::validate(buf).map_err(|_| Error::Crc)
     }
 
     /// Return the 48 bit serial number of the SGP30.
@@ -598,41 +582,6 @@ mod tests {
     use self::hal::delay::MockNoop as DelayMock;
     use self::hal::i2c::{Mock as I2cMock, Transaction};
     use super::*;
-
-    /// Test the `validate_crc` function.
-    #[test]
-    fn validate_crc() {
-        let mock = I2cMock::new(&[]);
-        let sgp = Sgp30::new(mock, 0x58, DelayMock);
-
-        // Not enough data
-        sgp.validate_crc(&[]).unwrap();
-        sgp.validate_crc(&[0xbe]).unwrap();
-        sgp.validate_crc(&[0xbe, 0xef]).unwrap();
-
-        // Valid CRC
-        sgp.validate_crc(&[0xbe, 0xef, 0x92]).unwrap();
-
-        // Invalid CRC
-        match sgp.validate_crc(&[0xbe, 0xef, 0x91]) {
-            Err(Error::Crc) => {}
-            Err(_) => panic!("Invalid error: Must be Crc"),
-            Ok(_) => panic!("CRC check did not fail"),
-        }
-
-        // Valid CRC (8 bytes)
-        sgp.validate_crc(&[0xbe, 0xef, 0x92, 0xbe, 0xef, 0x92, 0x00, 0x00])
-            .unwrap();
-
-        // Invalid CRC (8 bytes)
-        match sgp.validate_crc(&[0xbe, 0xef, 0x91, 0xbe, 0xef, 0xff, 0x00, 0x00]) {
-            Err(Error::Crc) => {}
-            Err(_) => panic!("Invalid error: Must be Crc"),
-            Ok(_) => panic!("CRC check did not fail"),
-        }
-
-        sgp.destroy().done();
-    }
 
     /// Test the `read_with_crc` function.
     #[test]
