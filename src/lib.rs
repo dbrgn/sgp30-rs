@@ -174,7 +174,7 @@ use embedded_hal as hal;
 use crate::hal::blocking::delay::{DelayMs, DelayUs};
 use crate::hal::blocking::i2c::{Read, Write, WriteRead};
 use byteorder::{BigEndian, ByteOrder};
-use sensirion_i2c::crc8;
+use sensirion_i2c::{crc8, i2c};
 
 mod types;
 
@@ -190,6 +190,20 @@ pub enum Error<E> {
     /// User tried to measure the air quality without starting the
     /// initialization phase.
     NotInitialized,
+}
+
+impl<E, I2cWrite, I2cRead> From<i2c::Error<I2cWrite, I2cRead>> for Error<E>
+where
+    I2cWrite: Write<Error = E>,
+    I2cRead: Read<Error = E>,
+{
+    fn from(err: i2c::Error<I2cWrite, I2cRead>) -> Self {
+        match err {
+            i2c::Error::Crc => Error::Crc,
+            i2c::Error::I2cWrite(e) => Error::I2c(e),
+            i2c::Error::I2cRead(e) => Error::I2c(e),
+        }
+    }
 }
 
 /// I²C commands sent to the sensor.
@@ -294,18 +308,6 @@ where
         self.i2c.write(self.address, payload).map_err(Error::I2c)
     }
 
-    /// Read data into the provided buffer and validate the CRC8 checksum.
-    ///
-    /// If the checksum is wrong, return `Error::Crc`.
-    ///
-    /// Note: This method will consider every third byte a checksum byte. If
-    /// the buffer size is not a multiple of 3, then not all data will be
-    /// validated.
-    fn read_with_crc(&mut self, mut buf: &mut [u8]) -> Result<(), Error<E>> {
-        self.i2c.read(self.address, &mut buf).map_err(Error::I2c)?;
-        crc8::validate(buf).map_err(|_| Error::Crc)
-    }
-
     /// Return the 48 bit serial number of the SGP30.
     pub fn serial(&mut self) -> Result<[u8; 6], Error<E>> {
         // Request serial number
@@ -316,7 +318,7 @@ where
 
         // Read serial number
         let mut buf = [0; 9];
-        self.read_with_crc(&mut buf)?;
+        i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
 
         Ok([buf[0], buf[1], buf[3], buf[4], buf[6], buf[7]])
     }
@@ -331,7 +333,7 @@ where
 
         // Read result
         let mut buf = [0; 3];
-        self.read_with_crc(&mut buf)?;
+        i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
 
         // Compare with self-test success pattern
         Ok(buf[0..2] == [0xd4, 0x00])
@@ -411,7 +413,7 @@ where
 
         // Read result
         let mut buf = [0; 6];
-        self.read_with_crc(&mut buf)?;
+        i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
         let co2eq_ppm = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
         let tvoc_ppb = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
 
@@ -442,7 +444,7 @@ where
 
         // Read result
         let mut buf = [0; 6];
-        self.read_with_crc(&mut buf)?;
+        i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
         let h2_signal = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
         let ethanol_signal = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
 
@@ -474,7 +476,7 @@ where
 
         // Read result
         let mut buf = [0; 6];
-        self.read_with_crc(&mut buf)?;
+        i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
         let co2eq_baseline = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
         let tvoc_baseline = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
 
@@ -569,7 +571,7 @@ where
 
         // Read result
         let mut buf = [0; 3];
-        self.read_with_crc(&mut buf)?;
+        i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
 
         Ok(FeatureSet::parse(buf[0], buf[1]))
     }
@@ -582,32 +584,6 @@ mod tests {
     use self::hal::delay::MockNoop as DelayMock;
     use self::hal::i2c::{Mock as I2cMock, Transaction};
     use super::*;
-
-    /// Test the `read_with_crc` function.
-    #[test]
-    fn read_with_crc() {
-        let mut buf = [0; 3];
-
-        // Valid CRC
-        let expectations = [Transaction::read(0x58, vec![0xBE, 0xEF, 0x92])];
-        let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
-        sgp.read_with_crc(&mut buf).unwrap();
-        assert_eq!(buf, [0xbe, 0xef, 0x92]);
-        sgp.destroy().done();
-
-        // Invalid CRC
-        let expectations = [Transaction::read(0x58, vec![0xBE, 0xEF, 0x00])];
-        let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
-        match sgp.read_with_crc(&mut buf) {
-            Err(Error::Crc) => {}
-            Err(_) => panic!("Invalid error: Must be Crc"),
-            Ok(_) => panic!("CRC check did not fail"),
-        }
-        assert_eq!(buf, [0xbe, 0xef, 0x00]); // Buf was changed
-        sgp.destroy().done();
-    }
 
     /// Test the `serial` function
     #[test]
