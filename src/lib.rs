@@ -174,12 +174,11 @@ use embedded_hal as hal;
 use crate::hal::blocking::delay::{DelayMs, DelayUs};
 use crate::hal::blocking::i2c::{Read, Write, WriteRead};
 use byteorder::{BigEndian, ByteOrder};
+use sensirion_i2c::crc8;
 
 mod types;
 
 pub use crate::types::{Baseline, FeatureSet, Humidity, Measurement, ProductType, RawSignals};
-
-const CRC8_POLYNOMIAL: u8 = 0x31;
 
 /// All possible errors in this crate
 #[derive(Debug)]
@@ -282,10 +281,10 @@ where
         let mut buf = [0; 2 /* command */ + 6 /* max length of data + crc */];
         buf[0..2].copy_from_slice(&command.as_bytes());
         buf[2..4].copy_from_slice(&data[0..2]);
-        buf[4] = crc8(&data[0..2]);
+        buf[4] = crc8::calculate(&data[0..2]);
         if data.len() > 2 {
             buf[5..7].copy_from_slice(&data[2..4]);
-            buf[7] = crc8(&data[2..4]);
+            buf[7] = crc8::calculate(&data[2..4]);
         }
         let payload = if data.len() > 2 {
             &buf[0..8]
@@ -304,7 +303,7 @@ where
     /// validated.
     fn validate_crc(&self, buf: &[u8]) -> Result<(), Error<E>> {
         for chunk in buf.chunks(3) {
-            if chunk.len() == 3 && crc8(&[chunk[0], chunk[1]]) != chunk[2] {
+            if chunk.len() == 3 && crc8::calculate(&[chunk[0], chunk[1]]) != chunk[2] {
                 return Err(Error::Crc);
             }
         }
@@ -592,24 +591,6 @@ where
     }
 }
 
-/// Calculate the CRC8 checksum.
-///
-/// Implementation based on the reference implementation by Sensirion.
-fn crc8(data: &[u8]) -> u8 {
-    let mut crc: u8 = 0xff;
-    for byte in data {
-        crc ^= byte;
-        for _ in 0..8 {
-            if (crc & 0x80) > 0 {
-                crc = (crc << 1) ^ CRC8_POLYNOMIAL;
-            } else {
-                crc <<= 1;
-            }
-        }
-    }
-    crc
-}
-
 #[cfg(test)]
 mod tests {
     use embedded_hal_mock as hal;
@@ -617,13 +598,6 @@ mod tests {
     use self::hal::delay::MockNoop as DelayMock;
     use self::hal::i2c::{Mock as I2cMock, Transaction};
     use super::*;
-
-    /// Test the crc8 function against the test value provided in the
-    /// datasheet (section 6.6).
-    #[test]
-    fn crc8_test_value() {
-        assert_eq!(crc8(&[0xbe, 0xef]), 0x92);
-    }
 
     /// Test the `validate_crc` function.
     #[test]
