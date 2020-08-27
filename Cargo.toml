@@ -26,6 +26,7 @@ default = []
 byteorder = { version = "1", default-features = false }
 embedded-hal = "0.2"
 num-traits = { version = "0.2", default-features = false }
+sensirion-i2c = "0.1"
 
 [dev-dependencies]
 linux-embedded-hal = "0.3"
