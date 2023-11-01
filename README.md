@@ -48,7 +48,7 @@ be dual licensed as above, without any additional terms or conditions.
 
 <!-- Badges -->
 [workflow]: https://github.com/dbrgn/sgp30-rs/actions?query=workflow%3ACI
-[workflow-badge]: https://img.shields.io/github/workflow/status/dbrgn/sgp30-rs/CI/master
+[workflow-badge]: https://github.com/dbrgn/sgp30-rs/actions/workflows/ci.yml/badge.svg
 [crates-io]: https://crates.io/crates/sgp30
 [crates-io-badge]: https://img.shields.io/crates/v/sgp30.svg?maxAge=3600
 [crates-io-download]: https://crates.io/crates/sgp30
