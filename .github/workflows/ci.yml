@@ -1,5 +1,8 @@
 on:
   push:
+    branches:
+      - main
+  pull_request:
   schedule:
     - cron: '30 3 * * 2'
 
@@ -15,55 +18,39 @@ jobs:
         rust: [1.74.1, stable]
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
-      - name: Run check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-features
+      - run: cargo check --all-features
 
   ensure_no_std:
     name: Ensure no_std
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - uses: dtolnay/rust-toolchain@stable
       - name: Download cargo-nono
         run: |
           wget https://github.com/hobofan/cargo-nono/releases/download/0.1.8/cargo-nono-0.1.8-x86_64-unknown-linux-gnu.tar.gz \
             && tar xfvz cargo-nono-0.1.8-x86_64-unknown-linux-gnu.tar.gz
-      - name: Run check
-        run: ./cargo-nono check
+      - run: ./cargo-nono check
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: stable
-            components: clippy
-            override: true
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+          components: clippy
+      - run: cargo clippy --all-features
 
   rustfmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-            toolchain: stable
-            components: rustfmt
-            override: true
+          components: rustfmt
       - run: cargo fmt -- --check
