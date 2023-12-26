@@ -30,7 +30,7 @@ sensirion-i2c = "0.1"
 
 [dev-dependencies]
 linux-embedded-hal = "0.3"
-embedded-hal-mock = "0.7"
+embedded-hal-mock = { version = "0.10.0-rc.4", features = ["eh0"] }
 
 [profile.release]
 lto = true
