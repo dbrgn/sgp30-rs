@@ -40,10 +40,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.74.1
         with:
           components: clippy
-      - run: cargo clippy --all-features
+      - run: cargo clippy --all-features -- -D warnings
 
   rustfmt:
     name: Rustfmt
