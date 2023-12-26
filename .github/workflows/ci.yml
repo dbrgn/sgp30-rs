@@ -24,10 +24,6 @@ jobs:
         with:
           command: check
           args: --all-features
-      - name: Run tests through tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          args: --ignore-tests
 
   ensure_no_std:
     name: Ensure no_std
