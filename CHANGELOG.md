@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 
+## [0.3.2] - 2023-12-26
+
+This is a maintenance release without any relevant changes to consumers of this
+driver.
+
+### Changed
+
+- Update the [sensirion-i2c](https://crates.io/crates/sensirion-i2c) dependency to 0.2
+
+
 ## [0.3.1] - 2020-08-28
 
 ### Changed
