@@ -169,12 +169,14 @@
 #![deny(missing_docs)]
 #![cfg_attr(not(test), no_std)]
 
-use embedded_hal as hal;
-
-use crate::hal::blocking::delay::{DelayMs, DelayUs};
-use crate::hal::blocking::i2c::{Read, Write, WriteRead};
 use byteorder::{BigEndian, ByteOrder};
+use embedded_hal as hal;
 use sensirion_i2c::{crc8, i2c};
+
+use crate::hal::blocking::{
+    delay::{DelayMs, DelayUs},
+    i2c::{Read, Write, WriteRead},
+};
 
 mod types;
 
@@ -581,8 +583,10 @@ where
 mod tests {
     use embedded_hal_mock as hal;
 
-    use self::hal::delay::MockNoop as DelayMock;
-    use self::hal::i2c::{Mock as I2cMock, Transaction};
+    use self::hal::eh0::{
+        delay::NoopDelay,
+        i2c::{Mock as I2cMock, Transaction},
+    };
     use super::*;
 
     /// Test the `serial` function
@@ -593,7 +597,7 @@ mod tests {
             Transaction::read(0x58, vec![0, 0, 129, 0, 100, 254, 204, 130, 135]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         let serial = sgp.serial().unwrap();
         assert_eq!(serial, [0, 0, 0, 100, 204, 130]);
         sgp.destroy().done();
@@ -607,8 +611,9 @@ mod tests {
             Transaction::read(0x58, vec![0xD4, 0x00, 0xC6]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         assert!(sgp.selftest().unwrap());
+        sgp.destroy().done();
     }
 
     /// Test the `selftest` function
@@ -619,15 +624,16 @@ mod tests {
             Transaction::read(0x58, vec![0x12, 0x34, 0x37]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         assert!(!sgp.selftest().unwrap());
+        sgp.destroy().done();
     }
 
     /// Test the `measure` function: Require initialization
     #[test]
     fn measure_initialization_required() {
         let mock = I2cMock::new(&[]);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         match sgp.measure() {
             Err(Error::NotInitialized) => {}
             Ok(_) => panic!("Error::NotInitialized not returned"),
@@ -645,7 +651,7 @@ mod tests {
             Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         sgp.init().unwrap();
         let measurements = sgp.measure().unwrap();
         assert_eq!(measurements.co2eq_ppm, 4_660);
@@ -662,7 +668,7 @@ mod tests {
             Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         sgp.init().unwrap();
         let baseline = sgp.get_baseline().unwrap();
         assert_eq!(baseline.co2eq, 4_660);
@@ -682,7 +688,7 @@ mod tests {
             ]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         sgp.init().unwrap();
         let baseline = Baseline {
             co2eq: 0x1234,
@@ -704,7 +710,7 @@ mod tests {
             ]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         sgp.init().unwrap();
         let humidity = Humidity::from_f32(15.5).unwrap();
         sgp.set_humidity(Some(&humidity)).unwrap();
@@ -723,7 +729,7 @@ mod tests {
             ]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         sgp.init().unwrap();
         sgp.set_humidity(None).unwrap();
         sgp.destroy().done();
@@ -738,7 +744,7 @@ mod tests {
             Transaction::read(0x58, vec![0x00, 0x42, 0xDE]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         sgp.init().unwrap();
         let feature_set = sgp.get_feature_set().unwrap();
         assert_eq!(feature_set.product_type, ProductType::Sgp30);
@@ -755,7 +761,7 @@ mod tests {
             Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0x56, 0x78, 0x7D]),
         ];
         let mock = I2cMock::new(&expectations);
-        let mut sgp = Sgp30::new(mock, 0x58, DelayMock);
+        let mut sgp = Sgp30::new(mock, 0x58, NoopDelay);
         sgp.init().unwrap();
         let signals = sgp.measure_raw_signals().unwrap();
         assert_eq!(signals.h2, (0x12 << 8) + 0x34);
