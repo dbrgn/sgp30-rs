@@ -31,8 +31,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Download cargo-nono
         run: |
-          wget https://github.com/hobofan/cargo-nono/releases/download/0.1.8/cargo-nono-0.1.8-x86_64-unknown-linux-gnu.tar.gz \
-            && tar xfvz cargo-nono-0.1.8-x86_64-unknown-linux-gnu.tar.gz
+          wget https://github.com/hobofan/cargo-nono/releases/download/0.1.9/cargo-nono-0.1.9-x86_64-unknown-linux-gnu.tar.gz \
+            && tar xfvz cargo-nono-0.1.9-x86_64-unknown-linux-gnu.tar.gz
       - run: ./cargo-nono check
 
   clippy:
