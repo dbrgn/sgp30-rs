@@ -76,7 +76,7 @@
 //! # use linux_embedded_hal as hal;
 //! # use hal::I2cdev;
 //! # use sgp30::Sgp30;
-//! use embedded_hal::blocking::delay::DelayMs;
+//! use embedded_hal::delay::DelayNs;
 //! use hal::Delay;
 //! use sgp30::Measurement;
 //!
@@ -88,7 +88,7 @@
 //!     let measurement: Measurement = sgp.measure().unwrap();
 //!     println!("CO₂eq parts per million: {}", measurement.co2eq_ppm);
 //!     println!("TVOC parts per billion: {}", measurement.tvoc_ppb);
-//!     Delay.delay_ms(1000u16 - 12);
+//!     Delay.delay_ms(1000 - 12);
 //! }
 //! # }
 //! ```
@@ -173,10 +173,7 @@ use byteorder::{BigEndian, ByteOrder};
 use embedded_hal as hal;
 use sensirion_i2c::{crc8, i2c};
 
-use crate::hal::blocking::{
-    delay::{DelayMs, DelayUs},
-    i2c::{Read, Write, WriteRead},
-};
+use crate::hal::{delay::DelayNs, i2c::I2c};
 
 mod types;
 
@@ -185,8 +182,10 @@ pub use crate::types::{Baseline, FeatureSet, Humidity, Measurement, ProductType,
 /// All possible errors in this crate
 #[derive(Debug)]
 pub enum Error<E> {
-    /// I²C bus error
-    I2c(E),
+    /// I²C bus error during a write
+    I2cWrite(E),
+    /// I²C bus error during a read
+    I2cRead(E),
     /// CRC checksum validation failed
     Crc,
     /// User tried to measure the air quality without starting the
@@ -194,16 +193,15 @@ pub enum Error<E> {
     NotInitialized,
 }
 
-impl<E, I2cWrite, I2cRead> From<i2c::Error<I2cWrite, I2cRead>> for Error<E>
+impl<I> From<i2c::Error<I>> for Error<I::Error>
 where
-    I2cWrite: Write<Error = E>,
-    I2cRead: Read<Error = E>,
+    I: I2c,
 {
-    fn from(err: i2c::Error<I2cWrite, I2cRead>) -> Self {
+    fn from(err: i2c::Error<I>) -> Self {
         match err {
             i2c::Error::Crc => Error::Crc,
-            i2c::Error::I2cWrite(e) => Error::I2c(e),
-            i2c::Error::I2cRead(e) => Error::I2c(e),
+            i2c::Error::I2cWrite(e) => Error::I2cRead(e),
+            i2c::Error::I2cRead(e) => Error::I2cWrite(e),
         }
     }
 }
@@ -260,10 +258,10 @@ pub struct Sgp30<I2C, D> {
     initialized: bool,
 }
 
-impl<I2C, D, E> Sgp30<I2C, D>
+impl<I2C, D> Sgp30<I2C, D>
 where
-    I2C: Read<Error = E> + Write<Error = E> + WriteRead<Error = E>,
-    D: DelayUs<u16> + DelayMs<u16>,
+    I2C: I2c,
+    D: DelayNs,
 {
     /// Create a new instance of the SGP30 driver.
     pub fn new(i2c: I2C, address: u8, delay: D) -> Self {
@@ -281,10 +279,10 @@ where
     }
 
     /// Write an I²C command to the sensor.
-    fn send_command(&mut self, command: Command) -> Result<(), Error<E>> {
+    fn send_command(&mut self, command: Command) -> Result<(), Error<I2C::Error>> {
         self.i2c
             .write(self.address, &command.as_bytes())
-            .map_err(Error::I2c)
+            .map_err(Error::I2cWrite)
     }
 
     /// Write an I²C command and data to the sensor.
@@ -292,7 +290,11 @@ where
     /// The data slice must have a length of 2 or 4.
     ///
     /// CRC checksums will automatically be added to the data.
-    fn send_command_and_data(&mut self, command: Command, data: &[u8]) -> Result<(), Error<E>> {
+    fn send_command_and_data(
+        &mut self,
+        command: Command,
+        data: &[u8],
+    ) -> Result<(), Error<I2C::Error>> {
         assert!(data.len() == 2 || data.len() == 4);
         let mut buf = [0; 2 /* command */ + 6 /* max length of data + crc */];
         buf[0..2].copy_from_slice(&command.as_bytes());
@@ -307,11 +309,13 @@ where
         } else {
             &buf[0..5]
         };
-        self.i2c.write(self.address, payload).map_err(Error::I2c)
+        self.i2c
+            .write(self.address, payload)
+            .map_err(Error::I2cWrite)
     }
 
     /// Return the 48 bit serial number of the SGP30.
-    pub fn serial(&mut self) -> Result<[u8; 6], Error<E>> {
+    pub fn serial(&mut self) -> Result<[u8; 6], Error<I2C::Error>> {
         // Request serial number
         self.send_command(Command::GetSerial)?;
 
@@ -326,7 +330,7 @@ where
     }
 
     /// Run an on-chip self-test. Return a boolean indicating whether the test succeeded.
-    pub fn selftest(&mut self) -> Result<bool, Error<E>> {
+    pub fn selftest(&mut self) -> Result<bool, Error<I2C::Error>> {
         // Start self test
         self.send_command(Command::SelfTest)?;
 
@@ -360,7 +364,7 @@ where
     /// the values should start to change.
     ///
     /// A new init command has to be sent after every power-up or soft reset.
-    pub fn init(&mut self) -> Result<(), Error<E>> {
+    pub fn init(&mut self) -> Result<(), Error<I2C::Error>> {
         if self.initialized {
             // Already initialized
             return Ok(());
@@ -372,7 +376,7 @@ where
     /// whether the sensor is already initialized.
     ///
     /// This might be necessary after a sensor soft or hard reset.
-    pub fn force_init(&mut self) -> Result<(), Error<E>> {
+    pub fn force_init(&mut self) -> Result<(), Error<I2C::Error>> {
         // Send command to sensor
         self.send_command(Command::InitAirQuality)?;
 
@@ -401,7 +405,7 @@ where
     /// sensor is in an initialization phase during which it returns fixed
     /// values of 400 ppm CO₂eq and 0 ppb TVOC. After 15 s (15 measurements)
     /// the values should start to change.
-    pub fn measure(&mut self) -> Result<Measurement, Error<E>> {
+    pub fn measure(&mut self) -> Result<Measurement, Error<I2C::Error>> {
         if !self.initialized {
             // Measurements weren't initialized
             return Err(Error::NotInitialized);
@@ -432,7 +436,7 @@ where
     /// calibration and baseline compensation algorithm. The command performs a
     /// measurement to which the sensor responds with the two signals for H2
     /// and Ethanol.
-    pub fn measure_raw_signals(&mut self) -> Result<RawSignals, Error<E>> {
+    pub fn measure_raw_signals(&mut self) -> Result<RawSignals, Error<I2C::Error>> {
         if !self.initialized {
             // Measurements weren't initialized
             return Err(Error::NotInitialized);
@@ -469,7 +473,7 @@ where
     /// algorithm can be restored by calling
     /// [`init()`](struct.Sgp30.html#method.init) followed by
     /// [`set_baseline()`](struct.Sgp30.html#method.set_baseline).
-    pub fn get_baseline(&mut self) -> Result<Baseline, Error<E>> {
+    pub fn get_baseline(&mut self) -> Result<Baseline, Error<I2C::Error>> {
         // Send command to sensor
         self.send_command(Command::GetBaseline)?;
 
@@ -502,7 +506,7 @@ where
     ///
     /// This function sets the baseline values for the two air quality
     /// signals.
-    pub fn set_baseline(&mut self, baseline: &Baseline) -> Result<(), Error<E>> {
+    pub fn set_baseline(&mut self, baseline: &Baseline) -> Result<(), Error<I2C::Error>> {
         if !self.initialized {
             // Measurements weren't initialized
             return Err(Error::NotInitialized);
@@ -540,7 +544,7 @@ where
     /// initialized using the [`init()`](struct.Sgp30.html#method.init) method.
     /// Otherwise an [`Error::NotInitialized`](enum.Error.html#variant.NotInitialized)
     /// will be returned.
-    pub fn set_humidity(&mut self, humidity: Option<&Humidity>) -> Result<(), Error<E>> {
+    pub fn set_humidity(&mut self, humidity: Option<&Humidity>) -> Result<(), Error<I2C::Error>> {
         if !self.initialized {
             // Measurements weren't initialized
             return Err(Error::NotInitialized);
@@ -564,7 +568,7 @@ where
     /// The SGP30 features a versioning system for the available set of
     /// measurement commands and on-chip algorithms. This so called feature set
     /// version number can be read out with this method.
-    pub fn get_feature_set(&mut self) -> Result<FeatureSet, Error<E>> {
+    pub fn get_feature_set(&mut self) -> Result<FeatureSet, Error<I2C::Error>> {
         // Send command to sensor
         self.send_command(Command::GetFeatureSet)?;
 
@@ -583,7 +587,7 @@ where
 mod tests {
     use embedded_hal_mock as hal;
 
-    use self::hal::eh0::{
+    use self::hal::eh1::{
         delay::NoopDelay,
         i2c::{Mock as I2cMock, Transaction},
     };
