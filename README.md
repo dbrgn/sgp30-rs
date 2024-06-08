@@ -6,7 +6,8 @@
 ![No Std][no-std-badge]
 
 This is a platform agnostic Rust driver for the Sensirion SGP30 gas sensor,
-based on the [`embedded-hal`](https://github.com/japaric/embedded-hal) traits.
+based on the [`embedded-hal`](https://github.com/japaric/embedded-hal) or
+[`embedded-hal-async`] traits.
 
 Docs: https://docs.rs/sgp30
 
@@ -29,6 +30,7 @@ Datasheet: https://www.sensirion.com/file/datasheet_sgp30
 - [x] Support on-chip self-test
 - [x] CRC checks
 - [x] Docs
+- [x] [`embedded-hal-async] support
 
 ## License
 
@@ -45,7 +47,7 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
 
-
+[`embedded-hal-async`]: https://crates.io/crates/embedded-hal-async
 <!-- Badges -->
 [workflow]: https://github.com/dbrgn/sgp30-rs/actions?query=workflow%3ACI
 [workflow-badge]: https://github.com/dbrgn/sgp30-rs/actions/workflows/ci.yml/badge.svg

@@ -21,10 +21,12 @@ edition = "2018"
 
 [features]
 default = []
+embedded-hal-async = ["dep:embedded-hal-async", "sensirion-i2c/embedded-hal-async"]
 
 [dependencies]
 byteorder = { version = "1", default-features = false }
 embedded-hal = "1"
+embedded-hal-async = { version = "1", optional = true }
 num-traits = { version = "0.2", default-features = false }
 sensirion-i2c = "0.3"
 
@@ -34,3 +36,12 @@ embedded-hal-mock = { version = "0.11.1", features = ["eh1"] }
 
 [profile.release]
 lto = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+# Necessary for `embedded-hal-async` support until a new release of
+# `sensirion-i2c-rs` is published.
+[patch.crates-io]
+sensirion-i2c = { git = "https://github.com/sensirion/sensirion-i2c-rs", rev = "f7b9f3a81b777bc6e6b2f0acb4c1ef9c57dfa06d" }

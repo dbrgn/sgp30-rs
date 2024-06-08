@@ -10,6 +10,17 @@ pub struct Measurement {
     pub tvoc_ppb: u16,
 }
 
+impl Measurement {
+    pub(crate) fn from_bytes(buf: &[u8; 6]) -> Self {
+        let co2eq_ppm = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
+        let tvoc_ppb = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
+        Self {
+            co2eq_ppm,
+            tvoc_ppb,
+        }
+    }
+}
+
 /// A raw signals result from the sensor.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RawSignals {
@@ -19,6 +30,14 @@ pub struct RawSignals {
     pub ethanol: u16,
 }
 
+impl RawSignals {
+    pub(crate) fn from_bytes(buf: &[u8; 6]) -> Self {
+        let h2 = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
+        let ethanol = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
+        Self { h2, ethanol }
+    }
+}
+
 /// The baseline values.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Baseline {
@@ -26,6 +45,16 @@ pub struct Baseline {
     pub co2eq: u16,
     /// TVOC baseline
     pub tvoc: u16,
+}
+
+impl Baseline {
+    pub(crate) fn from_bytes(buf: &[u8; 6]) -> Self {
+        let measurement = Measurement::from_bytes(buf);
+        Baseline {
+            co2eq: measurement.co2eq_ppm,
+            tvoc: measurement.tvoc_ppb,
+        }
+    }
 }
 
 /// Absolute humidity in g/m³.
