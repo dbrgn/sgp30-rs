@@ -1,4 +1,4 @@
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::delay::DelayNs;
 use linux_embedded_hal::{Delay, I2cdev};
 use sgp30::Sgp30;
 
@@ -6,7 +6,7 @@ fn measure_loop(sgp: &mut Sgp30<I2cdev, Delay>) -> ! {
     let mut i = 0;
     loop {
         if i != 0 {
-            Delay.delay_ms(1000u16 - 12 - 25);
+            Delay.delay_ms(1000u32 - 12 - 25);
         }
         if i % 10 == 0 {
             let baseline = sgp.get_baseline().unwrap();
