@@ -319,8 +319,214 @@ where
 
 #[cfg(test)]
 mod tests {
-    // TODO: `embedded-hal-mock`'s support for `embedded-hal-async` does not
-    // currently have a mock I2C implementation. When that's available, we
-    // should add tests for the async I2C functions here that are analogous to
-    // the ones in the `i2c` module.
+    use embedded_hal_mock as hal;
+
+    use self::hal::eh1::{
+        delay::NoopDelay,
+        i2c::{Mock as I2cMock, Transaction},
+    };
+    use super::*;
+    use futures_executor::block_on;
+
+    /// Test the `serial` function
+    #[test]
+    fn serial() {
+        block_on(async {
+            let expectations = [
+                Transaction::write(0x58, Command::GetSerial.as_bytes()[..].into()),
+                Transaction::read(0x58, vec![0, 0, 129, 0, 100, 254, 204, 130, 135]),
+            ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            let serial = sgp.serial().await.unwrap();
+            assert_eq!(serial, [0, 0, 0, 100, 204, 130]);
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `selftest` function
+    #[test]
+    fn selftest_ok() {
+        block_on(async {
+            let expectations = [
+                Transaction::write(0x58, Command::SelfTest.as_bytes()[..].into()),
+                Transaction::read(0x58, vec![0xD4, 0x00, 0xC6]),
+            ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            assert!(sgp.selftest().await.unwrap());
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `selftest` function
+    #[test]
+    fn selftest_fail() {
+        block_on(async {
+            let expectations = [
+                Transaction::write(0x58, Command::SelfTest.as_bytes()[..].into()),
+                Transaction::read(0x58, vec![0x12, 0x34, 0x37]),
+            ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            assert!(!sgp.selftest().await.unwrap());
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `measure` function: Require initialization
+    #[test]
+    fn measure_initialization_required() {
+        block_on(async {
+            let mock = I2cMock::new(&[]);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            match sgp.measure().await {
+                Err(Error::NotInitialized) => {}
+                Ok(_) => panic!("Error::NotInitialized not returned"),
+                Err(_) => panic!("Wrong error returned"),
+            }
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `measure` function: Calculation of return values
+    #[test]
+    fn measure_success() {
+        block_on(async {
+            let expectations = [
+                Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+                Transaction::write(0x58, Command::MeasureAirQuality.as_bytes()[..].into()),
+                Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]),
+            ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            sgp.init().await.unwrap();
+            let measurements = sgp.measure().await.unwrap();
+            assert_eq!(measurements.co2eq_ppm, 4_660);
+            assert_eq!(measurements.tvoc_ppb, 54_274);
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `get_baseline` function
+    #[test]
+    fn get_baseline() {
+        block_on(async {
+            let expectations = [
+                Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+                Transaction::write(0x58, Command::GetBaseline.as_bytes()[..].into()),
+                Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0xD4, 0x02, 0xA4]),
+            ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            sgp.init().await.unwrap();
+            let baseline = sgp.get_baseline().await.unwrap();
+            assert_eq!(baseline.co2eq, 4_660);
+            assert_eq!(baseline.tvoc, 54_274);
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `set_baseline` function
+    #[test]
+    fn set_baseline() {
+        block_on(async {
+            #[rustfmt::skip]
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, vec![
+                /* command: */ 0x20, 0x1E,
+                /* data + crc8: */ 0x56, 0x78, 0x7D, 0x12, 0x34, 0x37,
+            ]),
+        ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            sgp.init().await.unwrap();
+            let baseline = Baseline {
+                co2eq: 0x1234,
+                tvoc: 0x5678,
+            };
+            sgp.set_baseline(&baseline).await.unwrap();
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `set_humidity` function
+    #[test]
+    fn set_humidity() {
+        block_on(async {
+            #[rustfmt::skip]
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, vec![
+                /* command: */ 0x20, 0x61,
+                /* data + crc8: */ 0x0F, 0x80, 0x62,
+            ]),
+        ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            sgp.init().await.unwrap();
+            let humidity = Humidity::from_f32(15.5).unwrap();
+            sgp.set_humidity(Some(&humidity)).await.unwrap();
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `set_humidity` function with a None value
+    #[test]
+    fn set_humidity_none() {
+        block_on(async {
+            #[rustfmt::skip]
+        let expectations = [
+            Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+            Transaction::write(0x58, vec![
+                /* command: */ 0x20, 0x61,
+                /* data + crc8: */ 0x00, 0x00, 0x81,
+            ]),
+        ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            sgp.init().await.unwrap();
+            sgp.set_humidity(None).await.unwrap();
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `get_feature_set` function.
+    #[test]
+    fn get_feature_set() {
+        block_on(async {
+            let expectations = [
+                Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+                Transaction::write(0x58, Command::GetFeatureSet.as_bytes()[..].into()),
+                Transaction::read(0x58, vec![0x00, 0x42, 0xDE]),
+            ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            sgp.init().await.unwrap();
+            let feature_set = sgp.get_feature_set().await.unwrap();
+            assert_eq!(feature_set.product_type, ProductType::Sgp30);
+            assert_eq!(feature_set.product_version, 0x42);
+            sgp.destroy().done();
+        })
+    }
+
+    /// Test the `measure_raw_signals` function.
+    #[test]
+    fn measure_raw_signals() {
+        block_on(async {
+            let expectations = [
+                Transaction::write(0x58, Command::InitAirQuality.as_bytes()[..].into()),
+                Transaction::write(0x58, Command::MeasureRawSignals.as_bytes()[..].into()),
+                Transaction::read(0x58, vec![0x12, 0x34, 0x37, 0x56, 0x78, 0x7D]),
+            ];
+            let mock = I2cMock::new(&expectations);
+            let mut sgp = Sgp30Async::new(mock, 0x58, NoopDelay);
+            sgp.init().await.unwrap();
+            let signals = sgp.measure_raw_signals().await.unwrap();
+            assert_eq!(signals.h2, (0x12 << 8) + 0x34);
+            assert_eq!(signals.ethanol, (0x56 << 8) + 0x78);
+            sgp.destroy().done();
+        })
+    }
 }
