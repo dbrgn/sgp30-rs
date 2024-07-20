@@ -306,6 +306,7 @@ pub struct Sgp30<I2C, D> {
     initialized: bool,
 }
 
+/// The fixed data pattern returned when the on-chip self-test is successful.
 const SELFTEST_SUCCESS: &[u8] = &[0xd4, 0x00];
 
 impl<I2C, D> Sgp30<I2C, D>
