@@ -180,9 +180,9 @@
 //! ```
 //!
 //! Once the `embedded-hal-async` feature is enabled, construct an instance of
-//! the [`AsyncSgp30`] struct, providing types implementing the
+//! the [`Sgp30Async`] struct, providing types implementing the
 //! [`embedded_hal_async::i2c::I2c`] and [`embedded_hal_async::delay::DelayNs`]
-//! traits. The [`AsyncSgp30`] struct is identical to the [`Sgp30`] struct,
+//! traits. The [`Sgp30Async`] struct is identical to the [`Sgp30`] struct,
 //! except that its methods are `async fn`s.
 //!
 //! [`embedded-hal-async`]: https://crates.io/crates/embedded-hal-async
@@ -205,7 +205,7 @@ use crate::hal::{
 #[cfg(feature = "embedded-hal-async")]
 mod async_impl;
 #[cfg(feature = "embedded-hal-async")]
-pub use async_impl::AsyncSgp30;
+pub use async_impl::Sgp30Async;
 
 mod types;
 
@@ -276,6 +276,19 @@ impl Command {
         }
     }
 
+    /// Writes this command and the provided `data` bytes to `buf`, returning a
+    /// slice of the written portion of `buf`.
+    ///
+    /// # Arguments
+    ///
+    /// - `buf`: The buffer into which to write the command and data bytes.
+    ///   This buffer must be 8 bytes long.
+    /// - `data`: The data bytes to write after the command bytes. This slice
+    ///   must contain either 2 or 4 bytes.
+    ///
+    /// # Panics
+    ///
+    /// - If `data` is not either 2 or 4 bytes long.
     fn as_bytes_with_data<'buf>(self, buf: &'buf mut [u8; 8], data: &[u8]) -> &'buf [u8] {
         assert!(data.len() == 2 || data.len() == 4);
         buf[0..2].copy_from_slice(&self.as_bytes());

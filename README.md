@@ -6,7 +6,7 @@
 ![No Std][no-std-badge]
 
 This is a platform agnostic Rust driver for the Sensirion SGP30 gas sensor,
-based on the [`embedded-hal`](https://github.com/japaric/embedded-hal) or
+based on the [`embedded-hal`](https://github.com/rust-embedded/embedded-hal) or
 [`embedded-hal-async`] traits.
 
 Docs: https://docs.rs/sgp30

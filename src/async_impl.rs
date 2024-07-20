@@ -8,7 +8,7 @@ use sensirion_i2c::i2c_async;
 /// This type is identical to the [`Sgp30`](crate::Sgp30) type, but using the
 /// [`embedded_hal_async`] versions of the [`I2c`] and [`DelayNs`] traits.
 #[derive(Debug, Default)]
-pub struct AsyncSgp30<I2C, D> {
+pub struct Sgp30Async<I2C, D> {
     /// The concrete I²C device implementation.
     i2c: I2C,
     /// The I²C device address.
@@ -19,7 +19,7 @@ pub struct AsyncSgp30<I2C, D> {
     initialized: bool,
 }
 
-impl<I2C, D> AsyncSgp30<I2C, D>
+impl<I2C, D> Sgp30Async<I2C, D>
 where
     I2C: I2c,
     D: DelayNs,
