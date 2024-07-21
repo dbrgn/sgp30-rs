@@ -176,7 +176,7 @@
 //! feature flag in your `Cargo.toml`:
 //!
 //! ```toml
-//! sgp30 = { version = "0.4", features = ["embedded-hal-async"] }
+//! sgp30 = { version = "1", features = ["embedded-hal-async"] }
 //! ```
 //!
 //! Once the `embedded-hal-async` feature is enabled, construct an instance of
