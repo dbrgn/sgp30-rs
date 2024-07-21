@@ -22,6 +22,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - run: cargo check --all-features
+      - run: cargo test --all-features
 
   ensure_no_std:
     name: Ensure no_std
