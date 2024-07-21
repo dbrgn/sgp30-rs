@@ -164,16 +164,48 @@
 //! function with a `None` value sets the humidity value used for
 //! compensation to its default value (11.57 g/m³) until a new humidity
 //! value is sent.
+//!
+//! ## `embedded-hal-async` support
+//!
+//! This crate has optional support for the [`embedded-hal-async`] crate, which
+//! provides `async` versions of the `I2c` and `DelayNs` traits. Async support
+//! is an off-by-default optional feature, so that projects which aren't using
+//! [`embedded-hal-async`] can avoid the additional dependency.
+//!
+//! To use this crate with `embedded-hal-async`, enable the `embedded-hal-async`
+//! feature flag in your `Cargo.toml`:
+//!
+//! ```toml
+//! sgp30 = { version = "0.4", features = ["embedded-hal-async"] }
+//! ```
+//!
+//! Once the `embedded-hal-async` feature is enabled, construct an instance of
+//! the [`Sgp30Async`] struct, providing types implementing the
+//! [`embedded_hal_async::i2c::I2c`] and [`embedded_hal_async::delay::DelayNs`]
+//! traits. The [`Sgp30Async`] struct is identical to the [`Sgp30`] struct,
+//! except that its methods are `async fn`s.
+//!
+//! [`embedded-hal-async`]: https://crates.io/crates/embedded-hal-async
+//! [`embedded_hal_async::i2c::I2c`]: https://docs.rs/embedded-hal-async/embedded-hal-async
 
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 #![cfg_attr(not(test), no_std)]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 use byteorder::{BigEndian, ByteOrder};
 use embedded_hal as hal;
 use sensirion_i2c::{crc8, i2c};
 
-use crate::hal::{delay::DelayNs, i2c::I2c};
+use crate::hal::{
+    delay::DelayNs,
+    i2c::{ErrorType, I2c},
+};
+
+#[cfg(feature = "embedded-hal-async")]
+mod async_impl;
+#[cfg(feature = "embedded-hal-async")]
+pub use async_impl::Sgp30Async;
 
 mod types;
 
@@ -195,7 +227,7 @@ pub enum Error<E> {
 
 impl<I> From<i2c::Error<I>> for Error<I::Error>
 where
-    I: I2c,
+    I: ErrorType,
 {
     fn from(err: i2c::Error<I>) -> Self {
         match err {
@@ -243,6 +275,35 @@ impl Command {
             Command::GetFeatureSet => [0x20, 0x2F],
         }
     }
+
+    /// Writes this command and the provided `data` bytes to `buf`, returning a
+    /// slice of the written portion of `buf`.
+    ///
+    /// # Arguments
+    ///
+    /// - `buf`: The buffer into which to write the command and data bytes.
+    ///   This buffer must be 8 bytes long.
+    /// - `data`: The data bytes to write after the command bytes. This slice
+    ///   must contain either 2 or 4 bytes.
+    ///
+    /// # Panics
+    ///
+    /// - If `data` is not either 2 or 4 bytes long.
+    fn as_bytes_with_data<'buf>(self, buf: &'buf mut [u8; 8], data: &[u8]) -> &'buf [u8] {
+        assert!(data.len() == 2 || data.len() == 4);
+        buf[0..2].copy_from_slice(&self.as_bytes());
+        buf[2..4].copy_from_slice(&data[0..2]);
+        buf[4] = crc8::calculate(&data[0..2]);
+        if data.len() > 2 {
+            buf[5..7].copy_from_slice(&data[2..4]);
+            buf[7] = crc8::calculate(&data[2..4]);
+        }
+        if data.len() > 2 {
+            &buf[0..8]
+        } else {
+            &buf[0..5]
+        }
+    }
 }
 
 /// Driver for the SGP30
@@ -257,6 +318,9 @@ pub struct Sgp30<I2C, D> {
     /// Whether the air quality measurement was initialized.
     initialized: bool,
 }
+
+/// The fixed data pattern returned when the on-chip self-test is successful.
+const SELFTEST_SUCCESS: &[u8] = &[0xd4, 0x00];
 
 impl<I2C, D> Sgp30<I2C, D>
 where
@@ -295,20 +359,8 @@ where
         command: Command,
         data: &[u8],
     ) -> Result<(), Error<I2C::Error>> {
-        assert!(data.len() == 2 || data.len() == 4);
         let mut buf = [0; 2 /* command */ + 6 /* max length of data + crc */];
-        buf[0..2].copy_from_slice(&command.as_bytes());
-        buf[2..4].copy_from_slice(&data[0..2]);
-        buf[4] = crc8::calculate(&data[0..2]);
-        if data.len() > 2 {
-            buf[5..7].copy_from_slice(&data[2..4]);
-            buf[7] = crc8::calculate(&data[2..4]);
-        }
-        let payload = if data.len() > 2 {
-            &buf[0..8]
-        } else {
-            &buf[0..5]
-        };
+        let payload = command.as_bytes_with_data(&mut buf, data);
         self.i2c
             .write(self.address, payload)
             .map_err(Error::I2cWrite)
@@ -342,7 +394,7 @@ where
         i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
 
         // Compare with self-test success pattern
-        Ok(buf[0..2] == [0xd4, 0x00])
+        Ok(&buf[0..2] == SELFTEST_SUCCESS)
     }
 
     /// Initialize the air quality measurement.
@@ -420,13 +472,7 @@ where
         // Read result
         let mut buf = [0; 6];
         i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
-        let co2eq_ppm = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
-        let tvoc_ppb = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
-
-        Ok(Measurement {
-            co2eq_ppm,
-            tvoc_ppb,
-        })
+        Ok(Measurement::from_bytes(&buf))
     }
 
     /// Return sensor raw signals.
@@ -451,13 +497,7 @@ where
         // Read result
         let mut buf = [0; 6];
         i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
-        let h2_signal = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
-        let ethanol_signal = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
-
-        Ok(RawSignals {
-            h2: h2_signal,
-            ethanol: ethanol_signal,
-        })
+        Ok(RawSignals::from_bytes(&buf))
     }
 
     /// Return the baseline values of the baseline correction algorithm.
@@ -483,13 +523,7 @@ where
         // Read result
         let mut buf = [0; 6];
         i2c::read_words_with_crc(&mut self.i2c, self.address, &mut buf)?;
-        let co2eq_baseline = (u16::from(buf[0]) << 8) | u16::from(buf[1]);
-        let tvoc_baseline = (u16::from(buf[3]) << 8) | u16::from(buf[4]);
-
-        Ok(Baseline {
-            co2eq: co2eq_baseline,
-            tvoc: tvoc_baseline,
-        })
+        Ok(Baseline::from_bytes(&buf))
     }
 
     /// Set the baseline values for the baseline correction algorithm.

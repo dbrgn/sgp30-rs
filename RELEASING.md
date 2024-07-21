@@ -7,7 +7,7 @@ Set variables:
 
 Update version numbers:
 
-    $ vim -p Cargo.toml
+    $ vim -p Cargo.toml src/lib.rs
 
 Update changelog:
 

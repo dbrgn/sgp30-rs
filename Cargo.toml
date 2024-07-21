@@ -21,16 +21,31 @@ edition = "2018"
 
 [features]
 default = []
+embedded-hal-async = ["dep:embedded-hal-async", "sensirion-i2c/embedded-hal-async"]
 
 [dependencies]
 byteorder = { version = "1", default-features = false }
 embedded-hal = "1"
+embedded-hal-async = { version = "1", optional = true }
 num-traits = { version = "0.2", default-features = false }
-sensirion-i2c = "0.3"
+sensirion-i2c = "0.4"
 
 [dev-dependencies]
 linux-embedded-hal = "0.4"
-embedded-hal-mock = { version = "0.11.1", features = ["eh1"] }
+embedded-hal-mock = { version = "0.11.1", features = ["eh1", "embedded-hal-async"] }
+# A trivial futures executor is needed for testing asynchronous code.
+# We could alternatively just use one that polls the future in a loop, but
+# making a no-op `RawWaker` is a bit annoying and requires unsafe code that
+# could otherwise be avoided.
+# 
+# Alternatively, we could use `tokio-test` for this, but since we don't need
+# "the rest of tokio", `futures-executor` is probably a lighter-weight
+# dependency.
+futures-executor = { version = "0.3.30" }
 
 [profile.release]
 lto = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
