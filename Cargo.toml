@@ -1,6 +1,6 @@
 [package]
 name = "sgp30"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Danilo Bargen <mail@dbrgn.ch>"]
 documentation = "https://docs.rs/sgp30"
 repository = "https://github.com/dbrgn/sgp30-rs"
